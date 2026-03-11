@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import { and, eq, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import { pathToFileURL } from "node:url";
 import {
   users,
   organizations,
@@ -21,6 +23,68 @@ import {
 import dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 
+export const SEED_IDENTIFIERS = {
+  organizationName: "Prontoville Internet Services",
+  organizationSlug: "prontoville-internet-services",
+  hostelName: "Hostel A - Grace Hall",
+  hostelSlug: "hostel-a-grace-hall",
+  userEmails: [
+    "admin@investpronto.com",
+    "chioma@example.com",
+    "tunde@example.com",
+  ],
+} as const;
+
+export interface SeedCleanupStore {
+  findOrganizationIdBySlug(slug: string): Promise<string | null>;
+  findHostelIds(args: {
+    organizationId: string;
+    hostelSlug: string;
+  }): Promise<string[]>;
+  findUserIdsByEmails(emails: readonly string[]): Promise<string[]>;
+  deleteAuditLogsByHostelIds(hostelIds: readonly string[]): Promise<void>;
+  deleteAuditLogsByUserIds(userIds: readonly string[]): Promise<void>;
+  deleteHostelsByIds(hostelIds: readonly string[]): Promise<void>;
+  deleteUsersByIds(userIds: readonly string[]): Promise<void>;
+  deleteOrganizationById(organizationId: string): Promise<void>;
+}
+
+export async function resetSeedFixture(
+  store: SeedCleanupStore,
+  identifiers = SEED_IDENTIFIERS
+) {
+  const organizationId = await store.findOrganizationIdBySlug(
+    identifiers.organizationSlug
+  );
+  const hostelIds = organizationId
+    ? await store.findHostelIds({
+        organizationId,
+        hostelSlug: identifiers.hostelSlug,
+      })
+    : [];
+  const userIds = await store.findUserIdsByEmails(identifiers.userEmails);
+
+  if (hostelIds.length > 0) {
+    await store.deleteAuditLogsByHostelIds(hostelIds);
+  }
+
+  if (userIds.length > 0) {
+    await store.deleteAuditLogsByUserIds(userIds);
+  }
+
+  if (hostelIds.length > 0) {
+    await store.deleteHostelsByIds(hostelIds);
+  }
+
+  if (userIds.length > 0) {
+    await store.deleteUsersByIds(userIds);
+  }
+
+  if (organizationId) {
+    await store.deleteOrganizationById(organizationId);
+  }
+}
+
 function hashPassword(password: string): string {
   return crypto.createHash("sha256").update(password).digest("hex");
 }
@@ -29,11 +93,80 @@ function getMonthKey(date: Date = new Date()): number {
   return date.getFullYear() * 100 + (date.getMonth() + 1);
 }
 
-async function seed() {
+export async function seed() {
   const sql = neon(process.env.DATABASE_URL!);
   const db = drizzle(sql);
 
   console.log("Seeding database...");
+
+  await resetSeedFixture({
+    findOrganizationIdBySlug: async (slug) => {
+      const [organization] = await db
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(eq(organizations.slug, slug));
+
+      return organization?.id ?? null;
+    },
+    findHostelIds: async ({ organizationId, hostelSlug }) => {
+      const rows = await db
+        .select({ id: hostels.id })
+        .from(hostels)
+        .where(
+          and(
+            eq(hostels.organizationId, organizationId),
+            eq(hostels.slug, hostelSlug)
+          )
+        );
+
+      return rows.map((row) => row.id);
+    },
+    findUserIdsByEmails: async (emails) => {
+      if (emails.length === 0) {
+        return [];
+      }
+
+      const rows = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.email, [...emails]));
+
+      return rows.map((row) => row.id);
+    },
+    deleteAuditLogsByHostelIds: async (hostelIds) => {
+      if (hostelIds.length === 0) {
+        return;
+      }
+
+      await db
+        .delete(auditLogs)
+        .where(inArray(auditLogs.hostelId, [...hostelIds]));
+    },
+    deleteAuditLogsByUserIds: async (userIds) => {
+      if (userIds.length === 0) {
+        return;
+      }
+
+      await db.delete(auditLogs).where(inArray(auditLogs.userId, [...userIds]));
+    },
+    deleteHostelsByIds: async (hostelIds) => {
+      if (hostelIds.length === 0) {
+        return;
+      }
+
+      await db.delete(hostels).where(inArray(hostels.id, [...hostelIds]));
+    },
+    deleteUsersByIds: async (userIds) => {
+      if (userIds.length === 0) {
+        return;
+      }
+
+      await db.delete(users).where(inArray(users.id, [...userIds]));
+    },
+    deleteOrganizationById: async (organizationId) => {
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    },
+  });
 
   // Current and past month keys
   const now = new Date();
@@ -60,8 +193,8 @@ async function seed() {
   const [org] = await db
     .insert(organizations)
     .values({
-      name: "Prontoville Internet Services",
-      slug: "prontoville-internet-services",
+      name: SEED_IDENTIFIERS.organizationName,
+      slug: SEED_IDENTIFIERS.organizationSlug,
     })
     .returning({ id: organizations.id });
 
@@ -72,8 +205,8 @@ async function seed() {
     .insert(hostels)
     .values({
       organizationId: org.id,
-      name: "Hostel A - Grace Hall",
-      slug: "hostel-a-grace-hall",
+      name: SEED_IDENTIFIERS.hostelName,
+      slug: SEED_IDENTIFIERS.hostelSlug,
       address: "University of Lagos, Akoka, Lagos",
       totalSetupCost: "2500000.00",
       founderContribution: "1000000.00",
@@ -88,7 +221,7 @@ async function seed() {
     .insert(users)
     .values({
       name: "Admin User",
-      email: "admin@investpronto.com",
+      email: SEED_IDENTIFIERS.userEmails[0],
       passwordHash: hashPassword("admin123"),
       role: "super_admin",
     })
@@ -98,7 +231,7 @@ async function seed() {
     .insert(users)
     .values({
       name: "Chioma Okafor",
-      email: "chioma@example.com",
+      email: SEED_IDENTIFIERS.userEmails[1],
       passwordHash: hashPassword("investor123"),
       role: "investor",
     })
@@ -108,7 +241,7 @@ async function seed() {
     .insert(users)
     .values({
       name: "Tunde Bakare",
-      email: "tunde@example.com",
+      email: SEED_IDENTIFIERS.userEmails[2],
       passwordHash: hashPassword("operator123"),
       role: "operator",
     })
@@ -437,7 +570,12 @@ async function seed() {
   process.exit(0);
 }
 
-seed().catch((err) => {
-  console.error("Seed failed:", err);
-  process.exit(1);
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  seed().catch((err) => {
+    console.error("Seed failed:", err);
+    process.exit(1);
+  });
+}
