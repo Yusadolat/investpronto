@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatNaira, getMonthKey, formatMonthKey, getLastNMonthKeys } from "@/lib/utils";
+import { normalizeRevenueResponse } from "@/lib/page-data";
 import { DollarSign, Plus, TrendingUp, TrendingDown } from "lucide-react";
 
 interface RevenueEntry {
@@ -26,31 +27,31 @@ interface RevenueEntry {
 }
 
 const sourceOptions = [
-  { label: "Rent", value: "rent" },
-  { label: "Service Charge", value: "service_charge" },
-  { label: "Deposit", value: "deposit" },
-  { label: "Late Fee", value: "late_fee" },
-  { label: "Other", value: "other" },
+  { label: "Manual", value: "manual" },
+  { label: "Paystack", value: "paystack" },
+  { label: "Bank Transfer", value: "bank_transfer" },
+  { label: "Cash", value: "cash" },
 ];
 
 const statusOptions = [
-  { label: "Confirmed", value: "confirmed" },
+  { label: "Verified", value: "verified" },
   { label: "Pending", value: "pending" },
   { label: "Refunded", value: "refunded" },
+  { label: "Reversed", value: "reversed" },
 ];
 
 const sourceBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
-  rent: "success",
-  service_charge: "info",
-  deposit: "warning",
-  late_fee: "error",
-  other: "default",
+  manual: "success",
+  paystack: "info",
+  bank_transfer: "warning",
+  cash: "default",
 };
 
 const statusBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
-  confirmed: "success",
+  verified: "success",
   pending: "warning",
   refunded: "error",
+  reversed: "error",
 };
 
 export default function RevenuePage() {
@@ -74,22 +75,11 @@ export default function RevenuePage() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/revenue?hostelId=${hostelId}&monthKey=${selectedMonth}`
+        `/api/revenue?hostelId=${hostelId}&month=${selectedMonth}`
       );
       if (!res.ok) throw new Error("Failed to fetch revenue data");
       const json = await res.json();
-      const items = (json.revenue || json || []).map(
-        (r: Record<string, unknown>) => ({
-          id: r.id as string,
-          amount: Number(r.amount || 0),
-          source: (r.source as string) || "other",
-          description: (r.description as string) || "",
-          transactionDate: (r.transactionDate as string) || "",
-          status: (r.status as string) || "confirmed",
-          monthKey: Number(r.monthKey || 0),
-        })
-      );
-      setEntries(items);
+      setEntries(normalizeRevenueResponse(json));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -297,7 +287,7 @@ export default function RevenuePage() {
             name="status"
             options={statusOptions}
             required
-            defaultValue="confirmed"
+            defaultValue="verified"
           />
           <div className="flex justify-end gap-3 pt-2">
             <Button

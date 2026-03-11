@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
-import { monthlyFinancialSnapshots, revenueEntries, expenseEntries } from '@/db/schema';
+import {
+  monthlyFinancialSnapshots,
+  revenueEntries,
+  expenseEntries,
+  payouts,
+} from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 import { getLastNMonthKeys, formatMonthKey } from '@/lib/utils';
 import type { MonthlyFinancials } from '@/types';
+
+type MonthlyReportRow = MonthlyFinancials & {
+  investorPayouts: number;
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,10 +40,16 @@ export async function GET(request: NextRequest) {
 
     const snapshotMap = new Map(snapshots.map((s) => [s.month, s]));
 
-    const results: MonthlyFinancials[] = [];
+    const results: MonthlyReportRow[] = [];
 
     for (const mk of monthKeys) {
       const snapshot = snapshotMap.get(mk);
+      const [payoutData] = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${payouts.amount}), 0)`,
+        })
+        .from(payouts)
+        .where(and(eq(payouts.hostelId, hostelId), eq(payouts.month, mk)));
 
       if (snapshot) {
         results.push({
@@ -45,6 +60,7 @@ export async function GET(request: NextRequest) {
           netRevenue: parseFloat(snapshot.netRevenue),
           totalExpenses: parseFloat(snapshot.totalExpenses),
           netProfit: parseFloat(snapshot.netProfit),
+          investorPayouts: parseFloat(payoutData?.total || '0'),
         });
       } else {
         // Calculate on-the-fly
@@ -78,7 +94,6 @@ export async function GET(request: NextRequest) {
         const refunds = parseFloat(revenueData?.refunds || '0');
         const netRevenue = grossRevenue - refunds;
         const totalExpenses = parseFloat(expenseData?.total || '0');
-
         results.push({
           month: mk,
           monthLabel: formatMonthKey(mk),
@@ -87,6 +102,7 @@ export async function GET(request: NextRequest) {
           netRevenue,
           totalExpenses,
           netProfit: netRevenue - totalExpenses,
+          investorPayouts: parseFloat(payoutData?.total || '0'),
         });
       }
     }

@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatNaira } from "@/lib/utils";
+import { normalizeInvestorsResponse } from "@/lib/page-data";
 import { Users, Plus, ChevronRight } from "lucide-react";
 
 interface Investor {
@@ -28,17 +29,17 @@ interface Investor {
 }
 
 const agreementOptions = [
-  { label: "Profit Sharing", value: "profit_sharing" },
-  { label: "Fixed Return", value: "fixed_return" },
+  { label: "Profit Share", value: "profit_share" },
+  { label: "Revenue Share", value: "revenue_share" },
   { label: "Equity", value: "equity" },
-  { label: "Loan", value: "loan" },
+  { label: "Custom", value: "custom" },
 ];
 
 const agreementBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
-  profit_sharing: "info",
-  fixed_return: "success",
+  profit_share: "info",
+  revenue_share: "success",
   equity: "warning",
-  loan: "default",
+  custom: "default",
 };
 
 const statusBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
@@ -66,21 +67,7 @@ export default function InvestorsPage() {
       const res = await fetch(`/api/investors?hostelId=${hostelId}`);
       if (!res.ok) throw new Error("Failed to fetch investors");
       const json = await res.json();
-      const items = (json.investors || json || []).map(
-        (inv: Record<string, unknown>) => ({
-          id: inv.id as string,
-          userId: (inv.userId as string) || "",
-          name: (inv.name || inv.userName || "Investor") as string,
-          email: (inv.email || inv.userEmail || "") as string,
-          amountInvested: Number(inv.amountInvested || 0),
-          dateInvested: (inv.dateInvested as string) || "",
-          agreementType: (inv.agreementType as string) || "profit_sharing",
-          percentageShare: Number(inv.percentageShare || 0),
-          status: (inv.status as string) || "active",
-          notes: (inv.notes as string) || "",
-        })
-      );
-      setInvestors(items);
+      setInvestors(normalizeInvestorsResponse(json));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

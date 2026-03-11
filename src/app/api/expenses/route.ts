@@ -5,6 +5,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 import { logAudit } from '@/lib/audit';
 import { getMonthKey } from '@/lib/utils';
+import type { ExpenseCategory } from '@/types';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       conditions.push(eq(expenseEntries.month, parseInt(monthParam, 10)));
     }
     if (category) {
-      conditions.push(eq(expenseEntries.category, category as any));
+      conditions.push(eq(expenseEntries.category, category as ExpenseCategory));
     }
 
     const entries = await db

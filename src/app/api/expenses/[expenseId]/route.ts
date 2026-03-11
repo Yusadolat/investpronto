@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 import { logAudit } from '@/lib/audit';
 
-export async function PUT(
+async function updateExpense(
   request: NextRequest,
   { params }: { params: Promise<{ expenseId: string }> }
 ) {
@@ -70,4 +70,18 @@ export async function PUT(
   } catch (error) {
     return handleAuthError(error);
   }
+}
+
+export async function PUT(
+  request: NextRequest,
+  context: { params: Promise<{ expenseId: string }> }
+) {
+  return updateExpense(request, context);
+}
+
+export async function PATCH(
+  request: NextRequest,
+  context: { params: Promise<{ expenseId: string }> }
+) {
+  return updateExpense(request, context);
 }

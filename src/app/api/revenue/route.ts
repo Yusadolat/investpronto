@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { hostelId, amount, source, description, transactionDate } = body;
+    const { hostelId, amount, source, description, transactionDate, status } = body;
 
     if (!hostelId || amount == null || !source || !transactionDate) {
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         transactionDate,
         month,
-        status: 'verified',
+        status: status || 'verified',
         createdBy: ctx.userId,
       })
       .returning();

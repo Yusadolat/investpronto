@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { LoadingSpinner } from "@/components/ui/loading";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatNaira, formatMonthKey } from "@/lib/utils";
+import { normalizeMonthlyReportsResponse } from "@/lib/page-data";
 import {
   DollarSign,
   TrendingUp,
@@ -52,26 +53,7 @@ export default function ReportsPage() {
         );
         if (!res.ok) throw new Error("Failed to fetch reports");
         const json = await res.json();
-        const items = (json.reports || json || []).map(
-          (r: Record<string, unknown>) => ({
-            monthKey: Number(r.monthKey || 0),
-            grossRevenue: Number(r.grossRevenue || r.totalRevenue || 0),
-            refunds: Number(r.refunds || 0),
-            netRevenue: Number(
-              r.netRevenue ||
-                Number(r.grossRevenue || r.totalRevenue || 0) -
-                  Number(r.refunds || 0)
-            ),
-            expenses: Number(r.expenses || r.totalExpenses || 0),
-            netProfit: Number(
-              r.netProfit ||
-                Number(r.grossRevenue || r.totalRevenue || 0) -
-                  Number(r.refunds || 0) -
-                  Number(r.expenses || r.totalExpenses || 0)
-            ),
-            investorPayouts: Number(r.investorPayouts || r.payouts || 0),
-          })
-        );
+        const items = normalizeMonthlyReportsResponse(json);
         setReports(items.sort((a: MonthlyReport, b: MonthlyReport) => a.monthKey - b.monthKey));
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");

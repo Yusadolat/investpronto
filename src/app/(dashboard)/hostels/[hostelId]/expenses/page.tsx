@@ -13,6 +13,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatNaira, getMonthKey, formatMonthKey, getLastNMonthKeys } from "@/lib/utils";
+import { normalizeExpensesResponse } from "@/lib/page-data";
 import { Receipt, Plus } from "lucide-react";
 
 interface ExpenseEntry {
@@ -27,29 +28,21 @@ interface ExpenseEntry {
 }
 
 const categoryOptions = [
+  { label: "Bandwidth", value: "bandwidth" },
+  { label: "Power / Fuel", value: "power_fuel" },
   { label: "Maintenance", value: "maintenance" },
-  { label: "Utilities", value: "utilities" },
-  { label: "Salary", value: "salary" },
-  { label: "Supplies", value: "supplies" },
-  { label: "Insurance", value: "insurance" },
-  { label: "Tax", value: "tax" },
-  { label: "Marketing", value: "marketing" },
-  { label: "Legal", value: "legal" },
-  { label: "Repairs", value: "repairs" },
-  { label: "Other", value: "other" },
+  { label: "Staff / Operations", value: "staff_operations" },
+  { label: "Device Replacement", value: "device_replacement" },
+  { label: "Miscellaneous", value: "miscellaneous" },
 ];
 
 const categoryBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
+  bandwidth: "info",
+  power_fuel: "warning",
   maintenance: "warning",
-  utilities: "info",
-  salary: "success",
-  supplies: "default",
-  insurance: "info",
-  tax: "error",
-  marketing: "success",
-  legal: "warning",
-  repairs: "error",
-  other: "default",
+  staff_operations: "success",
+  device_replacement: "error",
+  miscellaneous: "default",
 };
 
 const approvalBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
@@ -79,23 +72,11 @@ export default function ExpensesPage() {
     setError(null);
     try {
       const res = await fetch(
-        `/api/expenses?hostelId=${hostelId}&monthKey=${selectedMonth}`
+        `/api/expenses?hostelId=${hostelId}&month=${selectedMonth}`
       );
       if (!res.ok) throw new Error("Failed to fetch expenses");
       const json = await res.json();
-      const items = (json.expenses || json || []).map(
-        (e: Record<string, unknown>) => ({
-          id: e.id as string,
-          amount: Number(e.amount || 0),
-          category: (e.category as string) || "other",
-          description: (e.description as string) || "",
-          expenseDate: (e.expenseDate as string) || "",
-          receiptUrl: (e.receiptUrl as string) || null,
-          approvalStatus: (e.approvalStatus as string) || "approved",
-          monthKey: Number(e.monthKey || 0),
-        })
-      );
-      setEntries(items);
+      setEntries(normalizeExpensesResponse(json));
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -149,7 +130,7 @@ export default function ExpensesPage() {
   async function handleApproval(expenseId: string, status: "approved" | "rejected") {
     try {
       const res = await fetch(`/api/expenses/${expenseId}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ approvalStatus: status }),
       });
