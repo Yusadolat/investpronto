@@ -6,12 +6,15 @@ import {
   investmentAgreements,
   revenueEntries,
   expenseEntries,
+  setupCostItems,
+  capitalContributions,
   users,
 } from '@/db/schema';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 import { logAudit } from '@/lib/audit';
 import { getMonthKey } from '@/lib/utils';
+import { buildTransparencySummary } from '@/lib/transparency';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -26,7 +29,7 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid hostel ID' }, { status: 400 });
     }
 
-    const ctx = await requireHostelAccess(hostelId);
+    await requireHostelAccess(hostelId);
 
     const [hostel] = await db
       .select()
@@ -118,6 +121,88 @@ export async function GET(
     const currentMonthRevenue = parseFloat(revenueData?.total || '0');
     const currentMonthExpenses = parseFloat(expenseData?.total || '0');
 
+    const rawSetupItems = await db
+      .select({
+        id: setupCostItems.id,
+        title: setupCostItems.title,
+        description: setupCostItems.description,
+        category: setupCostItems.category,
+        amount: setupCostItems.amount,
+        costType: setupCostItems.costType,
+        incurredAt: setupCostItems.incurredAt,
+        vendor: setupCostItems.vendor,
+        receiptUrl: setupCostItems.receiptUrl,
+        createdAt: setupCostItems.createdAt,
+      })
+      .from(setupCostItems)
+      .where(eq(setupCostItems.hostelId, hostelId))
+      .orderBy(desc(setupCostItems.incurredAt), desc(setupCostItems.createdAt));
+
+    const rawCapitalContributions = await db
+      .select({
+        id: capitalContributions.id,
+        contributorName: capitalContributions.contributorName,
+        contributorType: capitalContributions.contributorType,
+        amount: capitalContributions.amount,
+        contributionDate: capitalContributions.contributionDate,
+        linkedInvestorUserId: capitalContributions.linkedInvestorUserId,
+        notes: capitalContributions.notes,
+        createdAt: capitalContributions.createdAt,
+      })
+      .from(capitalContributions)
+      .where(eq(capitalContributions.hostelId, hostelId))
+      .orderBy(desc(capitalContributions.contributionDate), desc(capitalContributions.createdAt));
+
+    const normalizedSetupItems = rawSetupItems.map((item) => ({
+      ...item,
+      description: item.description || '',
+      amount: parseFloat(item.amount || '0'),
+      vendor: item.vendor || null,
+      receiptUrl: item.receiptUrl || null,
+    }));
+
+    const normalizedCapitalContributions = rawCapitalContributions.map((item) => ({
+      ...item,
+      amount: parseFloat(item.amount || '0'),
+      linkedInvestorUserId: item.linkedInvestorUserId || null,
+      notes: item.notes || null,
+    }));
+
+    const transparency = buildTransparencySummary(
+      {
+        totalSetupCost: parseFloat(hostel.totalSetupCost || '0'),
+      },
+      normalizedSetupItems.map((item) => ({
+        id: item.id,
+        amount: item.amount,
+        costType: item.costType,
+        category: item.category,
+      })),
+      normalizedCapitalContributions.map((item) => ({
+        id: item.id,
+        contributorName: item.contributorName,
+        contributorType: item.contributorType,
+        amount: item.amount,
+      }))
+    );
+
+    const normalizedInvestors = investors.map((investor) => {
+      const amountInvested = parseFloat(investor.amountInvested || '0');
+      const percentageShare = parseFloat(investor.percentageShare || '0');
+
+      return {
+        ...investor,
+        amountInvested,
+        percentageShare,
+        capitalPercentage:
+          parseFloat(hostel.totalSetupCost || '0') > 0
+            ? Math.round((amountInvested / parseFloat(hostel.totalSetupCost || '0')) * 10000) /
+              100
+            : 0,
+        profitSharePercentage: percentageShare,
+      };
+    });
+
     return NextResponse.json({
       hostel,
       dashboard: {
@@ -125,8 +210,13 @@ export async function GET(
         currentMonthExpenses,
         currentMonthProfit: currentMonthRevenue - currentMonthExpenses,
         investorCount: investorCountData?.count || 0,
-        investors,
+        investors: normalizedInvestors,
         recentExpenses,
+      },
+      transparency: {
+        summary: transparency,
+        setupItems: normalizedSetupItems,
+        capitalContributions: normalizedCapitalContributions,
       },
     });
   } catch (error) {

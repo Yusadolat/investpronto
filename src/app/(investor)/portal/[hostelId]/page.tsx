@@ -3,32 +3,35 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
+import {
+  ArrowLeft,
+  Clock,
+  DollarSign,
+  FileText,
+  PieChart,
+  Receipt,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
 import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingSpinner } from "@/components/ui/loading";
-import { formatNaira, formatMonthKey } from "@/lib/utils";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from "recharts";
-import {
-  DollarSign,
-  TrendingUp,
-  TrendingDown,
-  PieChart,
-  Wallet,
-  ArrowLeft,
-  FileText,
-  Clock,
-} from "lucide-react";
+import { formatNaira } from "@/lib/utils";
 
 interface Agreement {
   id: string;
@@ -65,6 +68,55 @@ interface InvestorData {
   monthlyTrend: MonthlyTrendEntry[];
 }
 
+interface SetupItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  amount: number;
+  costType: "one_time" | "recurring";
+  incurredAt: string;
+  vendor: string | null;
+}
+
+interface CapitalContribution {
+  id: string;
+  contributorName: string;
+  contributorType: "founder" | "cofounder" | "investor" | "other";
+  amount: number;
+  contributionDate: string;
+}
+
+interface HostelTransparencyResponse {
+  hostel: {
+    name: string;
+    status: string;
+    totalSetupCost: string;
+  };
+  transparency: {
+    summary: {
+      setup: {
+        totalBudget: number;
+        totalRecorded: number;
+        oneTimeTotal: number;
+        recurringTotal: number;
+        remainingBudget: number;
+      };
+      capital: {
+        totalContributed: number;
+        founderCapital: number;
+        cofounderCapital: number;
+        investorCapital: number;
+        otherCapital: number;
+        fundingGap: number;
+        excessCapital: number;
+      };
+    };
+    setupItems: SetupItem[];
+    capitalContributions: CapitalContribution[];
+  };
+}
+
 export default function InvestorHostelDetailPage() {
   const { data: session } = useSession();
   const params = useParams();
@@ -72,8 +124,9 @@ export default function InvestorHostelDetailPage() {
   const hostelId = params.hostelId as string;
 
   const [data, setData] = useState<InvestorData | null>(null);
-  const [hostelName, setHostelName] = useState("");
-  const [hostelStatus, setHostelStatus] = useState("");
+  const [hostelData, setHostelData] = useState<HostelTransparencyResponse | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,14 +140,14 @@ export default function InvestorHostelDetailPage() {
         ]);
 
         if (investorRes.ok) {
-          const investorData = await investorRes.json();
+          const investorData = (await investorRes.json()) as InvestorData;
           setData(investorData);
         }
 
         if (hostelRes.ok) {
-          const hostelData = await hostelRes.json();
-          setHostelName(hostelData.hostel?.name || "Hostel");
-          setHostelStatus(hostelData.hostel?.status || "active");
+          const hostelPayload =
+            (await hostelRes.json()) as HostelTransparencyResponse;
+          setHostelData(hostelPayload);
         }
       } catch {
         // network error
@@ -114,7 +167,7 @@ export default function InvestorHostelDetailPage() {
     );
   }
 
-  if (!data) {
+  if (!data || !hostelData) {
     return (
       <div className="py-20 text-center">
         <p className="text-gray-500">Unable to load investment data.</p>
@@ -137,12 +190,17 @@ export default function InvestorHostelDetailPage() {
     0,
     netProfit * ((agreement?.percentageShare || 0) / 100)
   );
+  const capitalStake =
+    hostelData.transparency.summary.setup.totalBudget > 0
+      ? (agreement?.amountInvested || 0) /
+        hostelData.transparency.summary.setup.totalBudget
+      : 0;
 
-  const chartData = [...data.monthlyTrend].reverse().map((m) => ({
-    name: m.monthLabel.replace(/\s\d{4}$/, ""),
-    Revenue: m.grossRevenue,
-    Expenses: m.totalExpenses,
-    Profit: m.netProfit,
+  const chartData = [...data.monthlyTrend].reverse().map((month) => ({
+    name: month.monthLabel.replace(/\s\d{4}$/, ""),
+    Revenue: month.grossRevenue,
+    Expenses: month.totalExpenses,
+    Profit: month.netProfit,
   }));
 
   const payoutColumns: Column<PayoutEntry>[] = [
@@ -171,9 +229,7 @@ export default function InvestorHostelDetailPage() {
       key: "paidAt",
       header: "Paid Date",
       render: (row) =>
-        row.paidAt
-          ? new Date(row.paidAt).toLocaleDateString("en-NG")
-          : "-",
+        row.paidAt ? new Date(row.paidAt).toLocaleDateString("en-NG") : "-",
     },
   ];
 
@@ -215,16 +271,72 @@ export default function InvestorHostelDetailPage() {
     },
   ];
 
+  const setupColumns: Column<SetupItem>[] = [
+    { key: "title", header: "Item" },
+    {
+      key: "category",
+      header: "Category",
+      render: (item) => (
+        <Badge variant="info">{item.category.replace(/_/g, " ")}</Badge>
+      ),
+    },
+    {
+      key: "costType",
+      header: "Type",
+      render: (item) => (
+        <Badge variant={item.costType === "recurring" ? "warning" : "default"}>
+          {item.costType === "recurring" ? "Recurring" : "One-time"}
+        </Badge>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      render: (item) => formatNaira(item.amount),
+    },
+    {
+      key: "incurredAt",
+      header: "Date",
+      render: (item) => new Date(item.incurredAt).toLocaleDateString("en-NG"),
+    },
+  ];
+
+  const capitalColumns: Column<CapitalContribution>[] = [
+    { key: "contributorName", header: "Contributor" },
+    {
+      key: "contributorType",
+      header: "Type",
+      render: (item) => (
+        <Badge variant="default">{item.contributorType.replace(/_/g, " ")}</Badge>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      render: (item) => formatNaira(item.amount),
+    },
+    {
+      key: "stake",
+      header: "Stake",
+      render: (item) => {
+        const stake =
+          hostelData.transparency.summary.setup.totalBudget > 0
+            ? (item.amount / hostelData.transparency.summary.setup.totalBudget) * 100
+            : 0;
+        return `${stake.toFixed(2)}%`;
+      },
+    },
+  ];
+
   const statusVariant =
-    hostelStatus === "active"
+    hostelData.hostel.status === "active"
       ? "success"
-      : hostelStatus === "inactive"
+      : hostelData.hostel.status === "inactive"
       ? "error"
       : "warning";
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-8">
         <button
           onClick={() => router.push("/portal")}
@@ -235,15 +347,16 @@ export default function InvestorHostelDetailPage() {
         </button>
 
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">{hostelName}</h1>
-          <Badge variant={statusVariant}>{hostelStatus}</Badge>
+          <h1 className="text-2xl font-bold text-gray-900">
+            {hostelData.hostel.name}
+          </h1>
+          <Badge variant={statusVariant}>{hostelData.hostel.status}</Badge>
         </div>
         <p className="mt-1 text-sm text-gray-500">
           Your investment dashboard for this hostel
         </p>
       </div>
 
-      {/* Primary Stats */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Invested"
@@ -258,7 +371,7 @@ export default function InvestorHostelDetailPage() {
         <StatCard
           title="Current Month Expenses"
           value={formatNaira(totalExpenses)}
-          subtitle="Verified expenses only"
+          subtitle="Approved expenses only"
           icon={<TrendingDown className="h-5 w-5" />}
         />
         <StatCard
@@ -268,23 +381,33 @@ export default function InvestorHostelDetailPage() {
         />
       </div>
 
-      {/* Secondary Stats */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-2">
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Your Share Percentage"
+          title="Capital Stake"
+          value={`${(capitalStake * 100).toFixed(2)}%`}
+          subtitle="Based on setup budget"
+          icon={<PieChart className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Profit Share"
           value={`${agreement?.percentageShare || 0}%`}
           subtitle={`${agreement?.agreementType?.replace("_", " ") || "-"} agreement`}
           icon={<PieChart className="h-5 w-5" />}
         />
         <StatCard
-          title="Your Expected Payout"
+          title="Expected Payout"
           value={formatNaira(expectedPayout)}
           subtitle="Based on current month profit"
           icon={<DollarSign className="h-5 w-5" />}
         />
+        <StatCard
+          title="Setup Budget"
+          value={formatNaira(hostelData.transparency.summary.setup.totalBudget)}
+          subtitle="Total project setup cost"
+          icon={<Receipt className="h-5 w-5" />}
+        />
       </div>
 
-      {/* Agreement Details */}
       {agreement && (
         <Card className="mb-8">
           <CardHeader>
@@ -302,9 +425,15 @@ export default function InvestorHostelDetailPage() {
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Percentage</p>
+                <p className="text-sm text-gray-500">Profit Share</p>
                 <p className="mt-1 font-medium text-gray-900">
                   {agreement.percentageShare}%
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Capital Stake</p>
+                <p className="mt-1 font-medium text-gray-900">
+                  {(capitalStake * 100).toFixed(2)}%
                 </p>
               </div>
               <div>
@@ -313,21 +442,11 @@ export default function InvestorHostelDetailPage() {
                   {new Date(agreement.dateInvested).toLocaleDateString("en-NG")}
                 </p>
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Status</p>
-                <Badge
-                  variant={agreement.status === "active" ? "success" : "warning"}
-                  className="mt-1"
-                >
-                  {agreement.status}
-                </Badge>
-              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Monthly Performance Chart */}
       {chartData.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
@@ -338,15 +457,10 @@ export default function InvestorHostelDetailPage() {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis
-                    dataKey="name"
-                    tick={{ fontSize: 12, fill: "#6b7280" }}
-                  />
+                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: "#6b7280" }} />
                   <YAxis
                     tick={{ fontSize: 12, fill: "#6b7280" }}
-                    tickFormatter={(v) =>
-                      `${(v / 1000).toFixed(0)}k`
-                    }
+                    tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
                   />
                   <Tooltip
                     formatter={(value) => formatNaira(Number(value))}
@@ -381,7 +495,96 @@ export default function InvestorHostelDetailPage() {
         </Card>
       )}
 
-      {/* Payout History */}
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Setup Spend Breakdown</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Recorded Spend"
+              value={formatNaira(hostelData.transparency.summary.setup.totalRecorded)}
+              subtitle="All setup items logged"
+            />
+            <StatCard
+              title="One-time Setup"
+              value={formatNaira(hostelData.transparency.summary.setup.oneTimeTotal)}
+              subtitle="Non-recurring purchases"
+            />
+            <StatCard
+              title="Recurring Setup"
+              value={formatNaira(hostelData.transparency.summary.setup.recurringTotal)}
+              subtitle="Ongoing setup-linked costs"
+            />
+            <StatCard
+              title="Budget Remaining"
+              value={formatNaira(hostelData.transparency.summary.setup.remainingBudget)}
+              subtitle="Unspent setup budget"
+            />
+          </div>
+
+          {hostelData.transparency.setupItems.length > 0 ? (
+            <DataTable
+              columns={setupColumns}
+              data={hostelData.transparency.setupItems}
+            />
+          ) : (
+            <EmptyState
+              title="No setup items recorded"
+              description="Setup spending details will appear here once they are logged."
+              icon={<Receipt className="h-6 w-6" />}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mb-8">
+        <CardHeader>
+          <CardTitle>Capital Stack</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard
+              title="Founder Capital"
+              value={formatNaira(hostelData.transparency.summary.capital.founderCapital)}
+              subtitle="Primary founder funding"
+            />
+            <StatCard
+              title="Co-founder Capital"
+              value={formatNaira(
+                hostelData.transparency.summary.capital.cofounderCapital
+              )}
+              subtitle="Co-founder funding"
+            />
+            <StatCard
+              title="Investor Capital"
+              value={formatNaira(hostelData.transparency.summary.capital.investorCapital)}
+              subtitle="External investor funding"
+            />
+            <StatCard
+              title="Total Capital Raised"
+              value={formatNaira(
+                hostelData.transparency.summary.capital.totalContributed
+              )}
+              subtitle="All contributions combined"
+            />
+          </div>
+
+          {hostelData.transparency.capitalContributions.length > 0 ? (
+            <DataTable
+              columns={capitalColumns}
+              data={hostelData.transparency.capitalContributions}
+            />
+          ) : (
+            <EmptyState
+              title="No capital contributions recorded"
+              description="Capital contribution records will appear here once they are logged."
+              icon={<Wallet className="h-6 w-6" />}
+            />
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Payout History</CardTitle>
@@ -389,13 +592,12 @@ export default function InvestorHostelDetailPage() {
         <CardContent>
           <DataTable
             columns={payoutColumns}
-            data={data.payoutHistory as any}
+            data={data.payoutHistory}
             emptyMessage="No payouts recorded yet"
           />
         </CardContent>
       </Card>
 
-      {/* Financial Summary */}
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Financial Summary</CardTitle>
@@ -403,17 +605,16 @@ export default function InvestorHostelDetailPage() {
         <CardContent>
           <DataTable
             columns={financialColumns}
-            data={data.monthlyTrend.slice(0, 6) as any}
+            data={data.monthlyTrend.slice(0, 6)}
             emptyMessage="No financial data available"
           />
         </CardContent>
       </Card>
 
-      {/* Transparency footer */}
       <div className="flex items-center gap-2 text-xs text-gray-400">
         <Clock className="h-3 w-3" />
         <span>
-          Last calculated: {new Date().toLocaleDateString("en-NG")} — All
+          Last calculated: {new Date().toLocaleDateString("en-NG")} - All
           figures are based on verified revenue and approved expenses only.
         </span>
       </div>

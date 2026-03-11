@@ -48,6 +48,18 @@ A centralized platform where:
 - Receipt upload support
 - Approval workflow (operator submits, admin approves)
 
+### Setup Transparency
+- Record hostel setup costs as line-by-line items, not just a single total
+- Mark each setup item as one-time or recurring
+- Show investors exactly how setup funds were spent before and after launch
+- Preserve vendors, dates, and receipts for auditability
+
+### Capital Stack Visibility
+- Track founder, co-founder, and investor contributions separately
+- Show each contributor's capital stake against the hostel setup budget
+- Compare capital stake with profit-share agreements for full transparency
+- Surface funding gaps or excess capital per hostel
+
 ### Profit Calculation Engine
 - Monthly per hostel: gross revenue - refunds - expenses = net distributable profit
 - Distributes profit per investor agreement percentages
@@ -80,7 +92,8 @@ All monetary values are in Nigerian Naira (NGN / ₦).
 
 One sample hostel is pre-configured:
 - **Hostel**: Grace Hall (University of Lagos)
-- **Setup cost**: ₦3,000,000
-- **Founder contribution**: ₦1,500,000
-- **Investor contribution**: ₦1,500,000 (Chioma Okafor, 50% profit share)
+- **Setup cost**: ₦2,500,000
+- **Founder + co-founder contribution**: ₦1,000,000
+- **Investor contribution**: ₦1,500,000 (Chioma Okafor, 60% profit share)
+- **Setup line items and capital contributions** are included for transparency
 - **3 months** of revenue, expenses, snapshots, and payouts

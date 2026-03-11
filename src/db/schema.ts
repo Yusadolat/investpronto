@@ -72,6 +72,18 @@ export const expenseCategoryEnum = pgEnum('expense_category', [
   'miscellaneous',
 ]);
 
+export const setupCostTypeEnum = pgEnum('setup_cost_type', [
+  'one_time',
+  'recurring',
+]);
+
+export const capitalContributorTypeEnum = pgEnum('capital_contributor_type', [
+  'founder',
+  'cofounder',
+  'investor',
+  'other',
+]);
+
 export const approvalStatusEnum = pgEnum('approval_status', [
   'approved',
   'pending',
@@ -276,6 +288,46 @@ export const expenseEntries = pgTable('expense_entries', {
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
 });
 
+export const setupCostItems = pgTable('setup_cost_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  hostelId: uuid('hostel_id')
+    .notNull()
+    .references(() => hostels.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: text('description'),
+  category: varchar('category', { length: 100 }).notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  costType: setupCostTypeEnum('cost_type').notNull().default('one_time'),
+  incurredAt: date('incurred_at').notNull(),
+  vendor: varchar('vendor', { length: 255 }),
+  receiptUrl: varchar('receipt_url', { length: 512 }),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});
+
+export const capitalContributions = pgTable('capital_contributions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  hostelId: uuid('hostel_id')
+    .notNull()
+    .references(() => hostels.id, { onDelete: 'cascade' }),
+  contributorName: varchar('contributor_name', { length: 255 }).notNull(),
+  contributorType: capitalContributorTypeEnum('contributor_type')
+    .notNull()
+    .default('other'),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  contributionDate: date('contribution_date').notNull(),
+  linkedInvestorUserId: uuid('linked_investor_user_id').references(() => users.id),
+  notes: text('notes'),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});
+
 export const monthlyFinancialSnapshots = pgTable(
   'monthly_financial_snapshots',
   {
@@ -394,6 +446,8 @@ export const hostelsRelations = relations(hostels, ({ one, many }) => ({
   revenueEntries: many(revenueEntries),
   paystackTransactions: many(paystackTransactions),
   expenseEntries: many(expenseEntries),
+  setupCostItems: many(setupCostItems),
+  capitalContributions: many(capitalContributions),
   monthlyFinancialSnapshots: many(monthlyFinancialSnapshots),
   payouts: many(payouts),
   auditLogs: many(auditLogs),
@@ -470,6 +524,41 @@ export const expenseEntriesRelations = relations(
       fields: [expenseEntries.approvedBy],
       references: [users.id],
       relationName: 'expenseApprover',
+    }),
+  })
+);
+
+export const setupCostItemsRelations = relations(
+  setupCostItems,
+  ({ one }) => ({
+    hostel: one(hostels, {
+      fields: [setupCostItems.hostelId],
+      references: [hostels.id],
+    }),
+    creator: one(users, {
+      fields: [setupCostItems.createdBy],
+      references: [users.id],
+      relationName: 'setupCostItemCreator',
+    }),
+  })
+);
+
+export const capitalContributionsRelations = relations(
+  capitalContributions,
+  ({ one }) => ({
+    hostel: one(hostels, {
+      fields: [capitalContributions.hostelId],
+      references: [hostels.id],
+    }),
+    creator: one(users, {
+      fields: [capitalContributions.createdBy],
+      references: [users.id],
+      relationName: 'capitalContributionCreator',
+    }),
+    linkedInvestor: one(users, {
+      fields: [capitalContributions.linkedInvestorUserId],
+      references: [users.id],
+      relationName: 'capitalContributionLinkedInvestor',
     }),
   })
 );

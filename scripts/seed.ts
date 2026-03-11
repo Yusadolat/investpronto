@@ -10,6 +10,8 @@ import {
   investmentAgreements,
   revenueEntries,
   expenseEntries,
+  setupCostItems,
+  capitalContributions,
   monthlyFinancialSnapshots,
   payouts,
   auditLogs,
@@ -73,8 +75,8 @@ async function seed() {
       name: "Hostel A - Grace Hall",
       slug: "hostel-a-grace-hall",
       address: "University of Lagos, Akoka, Lagos",
-      totalSetupCost: "3000000.00",
-      founderContribution: "1500000.00",
+      totalSetupCost: "2500000.00",
+      founderContribution: "1000000.00",
       status: "active",
     })
     .returning({ id: hostels.id });
@@ -136,9 +138,9 @@ async function seed() {
       amountInvested: "1500000.00",
       dateInvested: "2024-01-15",
       agreementType: "profit_share",
-      percentageShare: "50.00",
+      percentageShare: "60.00",
       status: "active",
-      notes: "50% profit share agreement for initial investment",
+      notes: "60% profit share agreement for initial investment",
     })
     .returning({ id: investmentAgreements.id });
 
@@ -194,9 +196,110 @@ async function seed() {
 
   console.log("Created expense entries");
 
-  // 8. Monthly financial snapshots
-  const totalExpenses = 150000 + 80000 + 100000 + 30000; // 360,000
+  // 8. Setup cost items and capital contributions
+  await db.insert(setupCostItems).values([
+    {
+      hostelId: hostel.id,
+      title: "Core router and network controller",
+      description: "Main routing hardware for the hostel network",
+      category: "hardware",
+      amount: "900000.00",
+      costType: "one_time",
+      incurredAt: "2024-01-05",
+      vendor: "NetCore Systems",
+      createdBy: adminUser.id,
+    },
+    {
+      hostelId: hostel.id,
+      title: "Access points and receivers",
+      description: "Wireless distribution points across the building",
+      category: "hardware",
+      amount: "480000.00",
+      costType: "one_time",
+      incurredAt: "2024-01-06",
+      vendor: "Signal Hub",
+      createdBy: adminUser.id,
+    },
+    {
+      hostelId: hostel.id,
+      title: "Cabling and trunking",
+      description: "Structured cabling for room and corridor runs",
+      category: "installation",
+      amount: "600000.00",
+      costType: "one_time",
+      incurredAt: "2024-01-08",
+      vendor: "Campus Wiring Co",
+      createdBy: adminUser.id,
+    },
+    {
+      hostelId: hostel.id,
+      title: "Installation labour",
+      description: "Mounting, routing, and testing costs",
+      category: "installation",
+      amount: "250000.00",
+      costType: "one_time",
+      incurredAt: "2024-01-10",
+      vendor: "Campus Wiring Co",
+      createdBy: adminUser.id,
+    },
+    {
+      hostelId: hostel.id,
+      title: "Permits and activation",
+      description: "Site access, approvals, and activation fees",
+      category: "permits",
+      amount: "150000.00",
+      costType: "one_time",
+      incurredAt: "2024-01-11",
+      vendor: "Hostel Management",
+      createdBy: adminUser.id,
+    },
+    {
+      hostelId: hostel.id,
+      title: "Startup bandwidth float",
+      description: "Initial recurring bandwidth reserve",
+      category: "bandwidth",
+      amount: "120000.00",
+      costType: "recurring",
+      incurredAt: "2024-01-12",
+      vendor: "ISP Partner",
+      createdBy: adminUser.id,
+    },
+  ]);
 
+  await db.insert(capitalContributions).values([
+    {
+      hostelId: hostel.id,
+      contributorName: "Founder",
+      contributorType: "founder",
+      amount: "600000.00",
+      contributionDate: "2024-01-03",
+      createdBy: adminUser.id,
+      notes: "Primary founder cash contribution",
+    },
+    {
+      hostelId: hostel.id,
+      contributorName: "Co-founder",
+      contributorType: "cofounder",
+      amount: "400000.00",
+      contributionDate: "2024-01-04",
+      createdBy: adminUser.id,
+      notes: "Co-founder cash contribution",
+    },
+    {
+      hostelId: hostel.id,
+      contributorName: "Chioma Okafor",
+      contributorType: "investor",
+      amount: "1500000.00",
+      contributionDate: "2024-01-15",
+      linkedInvestorUserId: investorUser.id,
+      createdBy: adminUser.id,
+      notes: "External investor funding round",
+    },
+  ]);
+
+  console.log("Created setup cost items and capital contributions");
+
+  // 9. Monthly financial snapshots
   const snapshotData = [
     {
       monthKey: twoMonthsAgoKey,
@@ -236,14 +339,14 @@ async function seed() {
 
   console.log("Created monthly financial snapshots");
 
-  // 9. Payouts
+  // 10. Payouts
   // Two months ago - paid
   await db.insert(payouts).values({
     hostelId: hostel.id,
     investorUserId: investorUser.id,
     agreementId: agreement.id,
     month: twoMonthsAgoKey,
-    amount: "245000.00", // 50% of 490k
+    amount: "294000.00", // 60% of 490k
     status: "paid",
     paidAt: new Date(
       Math.floor(twoMonthsAgoKey / 100),
@@ -259,7 +362,7 @@ async function seed() {
     investorUserId: investorUser.id,
     agreementId: agreement.id,
     month: lastMonthKey,
-    amount: "345000.00", // 50% of 690k
+    amount: "414000.00", // 60% of 690k
     status: "paid",
     paidAt: new Date(
       Math.floor(lastMonthKey / 100),
@@ -275,13 +378,13 @@ async function seed() {
     investorUserId: investorUser.id,
     agreementId: agreement.id,
     month: currentMonthKey,
-    amount: "420000.00", // 50% of 840k
+    amount: "504000.00", // 60% of 840k
     status: "pending",
   });
 
   console.log("Created payouts");
 
-  // 10. Audit logs
+  // 11. Audit logs
   const auditEntries = [
     {
       userId: adminUser.id,
@@ -300,7 +403,7 @@ async function seed() {
       details: {
         investorName: "Chioma Okafor",
         amount: 1500000,
-        percentage: 50,
+        percentage: 60,
       },
     },
     {
