@@ -121,37 +121,76 @@ export async function GET(
     const currentMonthRevenue = parseFloat(revenueData?.total || '0');
     const currentMonthExpenses = parseFloat(expenseData?.total || '0');
 
-    const rawSetupItems = await db
-      .select({
-        id: setupCostItems.id,
-        title: setupCostItems.title,
-        description: setupCostItems.description,
-        category: setupCostItems.category,
-        amount: setupCostItems.amount,
-        costType: setupCostItems.costType,
-        incurredAt: setupCostItems.incurredAt,
-        vendor: setupCostItems.vendor,
-        receiptUrl: setupCostItems.receiptUrl,
-        createdAt: setupCostItems.createdAt,
-      })
-      .from(setupCostItems)
-      .where(eq(setupCostItems.hostelId, hostelId))
-      .orderBy(desc(setupCostItems.incurredAt), desc(setupCostItems.createdAt));
+    let rawSetupItems: Array<{
+      id: string;
+      title: string;
+      description: string | null;
+      category: string;
+      amount: string;
+      costType: 'one_time' | 'recurring';
+      incurredAt: string;
+      vendor: string | null;
+      receiptUrl: string | null;
+      createdAt: Date;
+    }> = [];
 
-    const rawCapitalContributions = await db
-      .select({
-        id: capitalContributions.id,
-        contributorName: capitalContributions.contributorName,
-        contributorType: capitalContributions.contributorType,
-        amount: capitalContributions.amount,
-        contributionDate: capitalContributions.contributionDate,
-        linkedInvestorUserId: capitalContributions.linkedInvestorUserId,
-        notes: capitalContributions.notes,
-        createdAt: capitalContributions.createdAt,
-      })
-      .from(capitalContributions)
-      .where(eq(capitalContributions.hostelId, hostelId))
-      .orderBy(desc(capitalContributions.contributionDate), desc(capitalContributions.createdAt));
+    try {
+      rawSetupItems = await db
+        .select({
+          id: setupCostItems.id,
+          title: setupCostItems.title,
+          description: setupCostItems.description,
+          category: setupCostItems.category,
+          amount: setupCostItems.amount,
+          costType: setupCostItems.costType,
+          incurredAt: setupCostItems.incurredAt,
+          vendor: setupCostItems.vendor,
+          receiptUrl: setupCostItems.receiptUrl,
+          createdAt: setupCostItems.createdAt,
+        })
+        .from(setupCostItems)
+        .where(eq(setupCostItems.hostelId, hostelId))
+        .orderBy(desc(setupCostItems.incurredAt), desc(setupCostItems.createdAt));
+    } catch (error) {
+      if (!isMissingRelationError(error)) {
+        throw error;
+      }
+    }
+
+    let rawCapitalContributions: Array<{
+      id: string;
+      contributorName: string;
+      contributorType: 'founder' | 'cofounder' | 'investor' | 'other';
+      amount: string;
+      contributionDate: string;
+      linkedInvestorUserId: string | null;
+      notes: string | null;
+      createdAt: Date;
+    }> = [];
+
+    try {
+      rawCapitalContributions = await db
+        .select({
+          id: capitalContributions.id,
+          contributorName: capitalContributions.contributorName,
+          contributorType: capitalContributions.contributorType,
+          amount: capitalContributions.amount,
+          contributionDate: capitalContributions.contributionDate,
+          linkedInvestorUserId: capitalContributions.linkedInvestorUserId,
+          notes: capitalContributions.notes,
+          createdAt: capitalContributions.createdAt,
+        })
+        .from(capitalContributions)
+        .where(eq(capitalContributions.hostelId, hostelId))
+        .orderBy(
+          desc(capitalContributions.contributionDate),
+          desc(capitalContributions.createdAt)
+        );
+    } catch (error) {
+      if (!isMissingRelationError(error)) {
+        throw error;
+      }
+    }
 
     const normalizedSetupItems = rawSetupItems.map((item) => ({
       ...item,
@@ -222,6 +261,13 @@ export async function GET(
   } catch (error) {
     return handleAuthError(error);
   }
+}
+
+function isMissingRelationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /relation .* does not exist/i.test(error.message)
+  );
 }
 
 export async function PUT(
