@@ -13,7 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { formatNaira } from "@/lib/utils";
 import { normalizeInvestorsResponse } from "@/lib/page-data";
-import { Users, Plus, ChevronRight } from "lucide-react";
+import {
+  Users,
+  Plus,
+  ChevronRight,
+  TrendingUp,
+  PieChart,
+  Mail,
+  UserPlus,
+} from "lucide-react";
 
 interface Investor {
   id: string;
@@ -35,19 +43,27 @@ const agreementOptions = [
   { label: "Custom", value: "custom" },
 ];
 
-const agreementBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
+const agreementBadgeVariant: Record<
+  string,
+  "default" | "success" | "warning" | "error" | "info"
+> = {
   profit_share: "info",
   revenue_share: "success",
   equity: "warning",
   custom: "default",
 };
 
-const statusBadgeVariant: Record<string, "default" | "success" | "warning" | "error" | "info"> = {
+const statusBadgeVariant: Record<
+  string,
+  "default" | "success" | "warning" | "error" | "info"
+> = {
   active: "success",
   pending: "warning",
   invited: "info",
   inactive: "default",
 };
+
+type InviteTab = "investor" | "cofounder";
 
 export default function InvestorsPage() {
   const params = useParams();
@@ -58,7 +74,10 @@ export default function InvestorsPage() {
   const [error, setError] = React.useState<string | null>(null);
   const [modalOpen, setModalOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [selectedInvestor, setSelectedInvestor] = React.useState<Investor | null>(null);
+  const [selectedInvestor, setSelectedInvestor] =
+    React.useState<Investor | null>(null);
+  const [inviteTab, setInviteTab] = React.useState<InviteTab>("investor");
+  const [inviteSuccess, setInviteSuccess] = React.useState<string | null>(null);
 
   const fetchInvestors = React.useCallback(async () => {
     setLoading(true);
@@ -79,9 +98,10 @@ export default function InvestorsPage() {
     fetchInvestors();
   }, [fetchInvestors]);
 
-  async function handleInvite(e: React.FormEvent<HTMLFormElement>) {
+  async function handleInviteInvestor(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
+    setInviteSuccess(null);
 
     const formData = new FormData(e.currentTarget);
     const payload = {
@@ -101,16 +121,62 @@ export default function InvestorsPage() {
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to invite investor");
-      setModalOpen(false);
+      setInviteSuccess(
+        `Invitation sent to ${payload.email}`
+      );
       await fetchInvestors();
+      setTimeout(() => {
+        setModalOpen(false);
+        setInviteSuccess(null);
+      }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to invite investor");
+      setError(
+        err instanceof Error ? err.message : "Failed to invite investor"
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
-  const totalInvested = investors.reduce((s, inv) => s + inv.amountInvested, 0);
+  async function handleInviteCofounder(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    setInviteSuccess(null);
+
+    const formData = new FormData(e.currentTarget);
+    const payload = {
+      hostelId,
+      email: formData.get("email") as string,
+      role: formData.get("role") as string,
+    };
+
+    try {
+      const res = await fetch("/api/invitations/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error("Failed to send invitation");
+      setInviteSuccess(
+        `Invitation sent to ${payload.email}`
+      );
+      setTimeout(() => {
+        setModalOpen(false);
+        setInviteSuccess(null);
+      }, 2000);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to send invitation"
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const totalInvested = investors.reduce(
+    (s, inv) => s + inv.amountInvested,
+    0
+  );
   const totalShareAllocated = investors.reduce(
     (s, inv) => s + inv.percentageShare,
     0
@@ -123,23 +189,30 @@ export default function InvestorsPage() {
       render: (inv) => (
         <button
           onClick={() => setSelectedInvestor(inv)}
-          className="font-medium text-gray-900 hover:text-blue-600"
+          className="font-semibold text-slate-900 hover:text-blue-600 transition-colors"
         >
           {inv.name}
         </button>
       ),
     },
-    { key: "email", header: "Email" },
+    {
+      key: "email",
+      header: "Email",
+      hideOnMobile: true,
+    },
     {
       key: "amountInvested",
       header: "Invested",
       render: (inv) => (
-        <span className="font-medium">{formatNaira(inv.amountInvested)}</span>
+        <span className="font-semibold text-slate-900">
+          {formatNaira(inv.amountInvested)}
+        </span>
       ),
     },
     {
       key: "agreementType",
       header: "Agreement",
+      hideOnMobile: true,
       render: (inv) => (
         <Badge
           variant={agreementBadgeVariant[inv.agreementType] || "default"}
@@ -151,11 +224,14 @@ export default function InvestorsPage() {
     {
       key: "percentageShare",
       header: "Share",
-      render: (inv) => `${inv.percentageShare}%`,
+      render: (inv) => (
+        <span className="font-medium text-slate-700">{inv.percentageShare}%</span>
+      ),
     },
     {
       key: "status",
       header: "Status",
+      hideOnMobile: true,
       render: (inv) => (
         <Badge variant={statusBadgeVariant[inv.status] || "default"}>
           {inv.status}
@@ -168,7 +244,7 @@ export default function InvestorsPage() {
       render: (inv) => (
         <button
           onClick={() => setSelectedInvestor(inv)}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-slate-300 hover:text-slate-500 transition-colors"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -181,40 +257,71 @@ export default function InvestorsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Investors</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage investors and their agreements
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Investors
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Manage investors and team members
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)}>
+        <Button onClick={() => setModalOpen(true)} className="w-full sm:w-auto">
           <Plus className="mr-2 h-4 w-4" />
-          Invite Investor
+          Invite
         </Button>
       </div>
 
       {/* Summary */}
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
         <Card className="p-5">
-          <p className="text-sm font-medium text-gray-500">Total Investors</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {investors.length}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">
+                Total Investors
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">
+                {investors.length}
+              </p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+              <Users className="h-5 w-5" />
+            </div>
+          </div>
         </Card>
         <Card className="p-5">
-          <p className="text-sm font-medium text-gray-500">Total Invested</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {formatNaira(totalInvested)}
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500">
+                Total Invested
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">
+                {formatNaira(totalInvested)}
+              </p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+              <TrendingUp className="h-5 w-5" />
+            </div>
+          </div>
         </Card>
         <Card className="p-5">
-          <p className="text-sm font-medium text-gray-500">Share Allocated</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">
-            {totalShareAllocated.toFixed(1)}%
-          </p>
-          <div className="mt-2 h-2 w-full rounded-full bg-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-medium text-slate-500">
+                Share Allocated
+              </p>
+              <p className="mt-1 text-2xl font-bold text-slate-900">
+                {totalShareAllocated.toFixed(1)}%
+              </p>
+            </div>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <PieChart className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-slate-100">
             <div
-              className="h-2 rounded-full bg-blue-600 transition-all"
-              style={{ width: `${Math.min(totalShareAllocated, 100)}%` }}
+              className="h-1.5 rounded-full bg-blue-600 transition-all duration-500"
+              style={{
+                width: `${Math.min(totalShareAllocated, 100)}%`,
+              }}
             />
           </div>
         </Card>
@@ -227,11 +334,11 @@ export default function InvestorsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-8">
+            <div className="flex justify-center py-10">
               <LoadingSpinner />
             </div>
           ) : error ? (
-            <div className="py-8 text-center text-sm text-red-600">
+            <div className="py-10 text-center text-sm text-red-600">
               {error}
             </div>
           ) : investors.length > 0 ? (
@@ -250,71 +357,170 @@ export default function InvestorsPage() {
         </CardContent>
       </Card>
 
-      {/* Invite Modal */}
+      {/* Invite Modal — Tabbed for Investor / Co-Founder */}
       <Modal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        title="Invite Investor"
+        onClose={() => {
+          setModalOpen(false);
+          setInviteSuccess(null);
+        }}
+        title="Send Invitation"
       >
-        <form onSubmit={handleInvite} className="space-y-4">
-          <Input
-            label="Email"
-            name="email"
-            type="email"
-            required
-            placeholder="investor@example.com"
-          />
-          <Input
-            label="Amount Invested (₦)"
-            name="amountInvested"
-            type="number"
-            min="0"
-            step="0.01"
-            required
-            placeholder="e.g. 5000000"
-          />
-          <Input
-            label="Date Invested"
-            name="dateInvested"
-            type="date"
-            required
-            defaultValue={new Date().toISOString().split("T")[0]}
-          />
-          <Select
-            label="Agreement Type"
-            name="agreementType"
-            options={agreementOptions}
-            required
-            placeholder="Select agreement"
-          />
-          <Input
-            label="Percentage Share (%)"
-            name="percentageShare"
-            type="number"
-            min="0"
-            max="100"
-            step="0.01"
-            required
-            placeholder="e.g. 20"
-          />
-          <Input
-            label="Notes (optional)"
-            name="notes"
-            placeholder="Additional notes..."
-          />
-          <div className="flex justify-end gap-3 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={submitting}>
-              Send Invite
-            </Button>
+        {inviteSuccess ? (
+          <div className="flex flex-col items-center py-6 gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-100">
+              <Mail className="h-6 w-6 text-emerald-600" />
+            </div>
+            <p className="text-sm font-medium text-slate-900">
+              {inviteSuccess}
+            </p>
+            <p className="text-xs text-slate-500">
+              They'll receive an email with instructions to join.
+            </p>
           </div>
-        </form>
+        ) : (
+          <>
+            {/* Tab switcher */}
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-xl mb-5">
+              <button
+                type="button"
+                onClick={() => setInviteTab("investor")}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all ${
+                  inviteTab === "investor"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <TrendingUp className="h-3.5 w-3.5" />
+                Investor
+              </button>
+              <button
+                type="button"
+                onClick={() => setInviteTab("cofounder")}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-all ${
+                  inviteTab === "cofounder"
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Co-Founder / Team
+              </button>
+            </div>
+
+            {inviteTab === "investor" ? (
+              <form onSubmit={handleInviteInvestor} className="space-y-4">
+                <Input
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="investor@example.com"
+                />
+                <Input
+                  label="Amount Invested"
+                  name="amountInvested"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  required
+                  placeholder="e.g. 5,000,000"
+                />
+                <Input
+                  label="Date Invested"
+                  name="dateInvested"
+                  type="date"
+                  required
+                  defaultValue={new Date().toISOString().split("T")[0]}
+                />
+                <Select
+                  label="Agreement Type"
+                  name="agreementType"
+                  options={agreementOptions}
+                  required
+                  placeholder="Select agreement"
+                />
+                <Input
+                  label="Percentage Share (%)"
+                  name="percentageShare"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  required
+                  placeholder="e.g. 20"
+                />
+                <Input
+                  label="Notes (optional)"
+                  name="notes"
+                  placeholder="Additional notes..."
+                />
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalOpen(false)}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    loading={submitting}
+                    className="w-full sm:w-auto"
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send Invite
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleInviteCofounder} className="space-y-4">
+                <Input
+                  label="Email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="cofounder@example.com"
+                />
+                <Select
+                  label="Role"
+                  name="role"
+                  options={[
+                    { label: "Co-Founder (Admin)", value: "admin" },
+                    { label: "Operator", value: "operator" },
+                  ]}
+                  required
+                  placeholder="Select role"
+                />
+                <p className="text-xs text-slate-500 leading-relaxed rounded-xl bg-slate-50 p-3 border border-slate-100">
+                  <strong className="text-slate-700">Co-Founders</strong> get
+                  full admin access to manage this property.{" "}
+                  <strong className="text-slate-700">Operators</strong> can log
+                  revenue, expenses, and manage daily operations.
+                </p>
+                <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setModalOpen(false)}
+                    className="w-full sm:w-auto"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    loading={submitting}
+                    className="w-full sm:w-auto"
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Send Invite
+                  </Button>
+                </div>
+              </form>
+            )}
+          </>
+        )}
       </Modal>
 
       {/* Investor Detail Modal */}
@@ -324,9 +530,9 @@ export default function InvestorsPage() {
         title="Investor Details"
       >
         {selectedInvestor && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 text-lg font-bold">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 text-lg font-bold">
                 {selectedInvestor.name
                   .split(" ")
                   .map((n) => n[0])
@@ -334,42 +540,39 @@ export default function InvestorsPage() {
                   .toUpperCase()
                   .slice(0, 2)}
               </div>
-              <div>
-                <p className="font-semibold text-gray-900">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900">
                   {selectedInvestor.name}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-500 truncate">
                   {selectedInvestor.email}
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 rounded-lg border border-gray-200 p-4">
+            <div className="grid grid-cols-2 gap-4 rounded-xl border border-slate-200 p-4">
               <div>
-                <p className="text-xs font-medium text-gray-500">
+                <p className="text-xs font-medium text-slate-500">
                   Amount Invested
                 </p>
-                <p className="mt-1 font-semibold text-gray-900">
+                <p className="mt-1 font-semibold text-slate-900">
                   {formatNaira(selectedInvestor.amountInvested)}
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">
-                  Share
-                </p>
-                <p className="mt-1 font-semibold text-gray-900">
+                <p className="text-xs font-medium text-slate-500">Share</p>
+                <p className="mt-1 font-semibold text-slate-900">
                   {selectedInvestor.percentageShare}%
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">
-                  Agreement
-                </p>
+                <p className="text-xs font-medium text-slate-500">Agreement</p>
                 <p className="mt-1">
                   <Badge
                     variant={
-                      agreementBadgeVariant[selectedInvestor.agreementType] ||
-                      "default"
+                      agreementBadgeVariant[
+                        selectedInvestor.agreementType
+                      ] || "default"
                     }
                   >
                     {selectedInvestor.agreementType.replace(/_/g, " ")}
@@ -377,11 +580,12 @@ export default function InvestorsPage() {
                 </p>
               </div>
               <div>
-                <p className="text-xs font-medium text-gray-500">Status</p>
+                <p className="text-xs font-medium text-slate-500">Status</p>
                 <p className="mt-1">
                   <Badge
                     variant={
-                      statusBadgeVariant[selectedInvestor.status] || "default"
+                      statusBadgeVariant[selectedInvestor.status] ||
+                      "default"
                     }
                   >
                     {selectedInvestor.status}
@@ -389,10 +593,10 @@ export default function InvestorsPage() {
                 </p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs font-medium text-gray-500">
+                <p className="text-xs font-medium text-slate-500">
                   Date Invested
                 </p>
-                <p className="mt-1 text-sm text-gray-900">
+                <p className="mt-1 text-sm text-slate-900">
                   {selectedInvestor.dateInvested
                     ? new Date(
                         selectedInvestor.dateInvested
@@ -406,8 +610,8 @@ export default function InvestorsPage() {
               </div>
               {selectedInvestor.notes && (
                 <div className="col-span-2">
-                  <p className="text-xs font-medium text-gray-500">Notes</p>
-                  <p className="mt-1 text-sm text-gray-700">
+                  <p className="text-xs font-medium text-slate-500">Notes</p>
+                  <p className="mt-1 text-sm text-slate-700">
                     {selectedInvestor.notes}
                   </p>
                 </div>

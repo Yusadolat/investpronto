@@ -5,6 +5,7 @@ interface Column<T> {
   key: string;
   header: string;
   render?: (item: T) => React.ReactNode;
+  hideOnMobile?: boolean;
 }
 
 interface DataTableProps<T> {
@@ -22,26 +23,34 @@ function DataTable<T extends Record<string, any>>({
   className,
 }: DataTableProps<T>) {
   return (
-    <div className={cn("w-full overflow-x-auto rounded-xl border border-gray-200", className)}>
+    <div
+      className={cn(
+        "w-full overflow-x-auto rounded-xl border border-slate-200 scrollbar-thin",
+        className
+      )}
+    >
       <table className="w-full text-left text-sm">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50">
+          <tr className="border-b border-slate-200 bg-slate-50/80">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className="whitespace-nowrap px-4 py-3 text-xs font-medium uppercase tracking-wider text-gray-500"
+                className={cn(
+                  "whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500",
+                  col.hideOnMobile && "hidden sm:table-cell"
+                )}
               >
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200 bg-white">
+        <tbody className="divide-y divide-slate-100 bg-white">
           {data.length === 0 ? (
             <tr>
               <td
                 colSpan={columns.length}
-                className="px-4 py-8 text-center text-sm text-gray-500"
+                className="px-4 py-10 text-center text-sm text-slate-400"
               >
                 {emptyMessage}
               </td>
@@ -50,12 +59,15 @@ function DataTable<T extends Record<string, any>>({
             data.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="transition-colors hover:bg-gray-50"
+                className="transition-colors hover:bg-slate-50/60"
               >
                 {columns.map((col) => (
                   <td
                     key={col.key}
-                    className="whitespace-nowrap px-4 py-3 text-gray-700"
+                    className={cn(
+                      "whitespace-nowrap px-4 py-3.5 text-slate-700",
+                      col.hideOnMobile && "hidden sm:table-cell"
+                    )}
                   >
                     {col.render
                       ? col.render(row)

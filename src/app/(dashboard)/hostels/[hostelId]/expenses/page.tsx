@@ -23,6 +23,7 @@ interface ExpenseEntry {
   description: string;
   expenseDate: string;
   receiptUrl: string | null;
+  spenderName: string | null;
   approvalStatus: string;
   monthKey: number;
 }
@@ -109,6 +110,7 @@ export default function ExpensesPage() {
       category: formData.get("category") as string,
       description: formData.get("description") as string,
       expenseDate: formData.get("expenseDate") as string,
+      spenderName: (formData.get("spenderName") as string) || undefined,
     };
 
     try {
@@ -153,8 +155,18 @@ export default function ExpensesPage() {
         }),
     },
     {
+      key: "spenderName",
+      header: "Spent By",
+      render: (e) => (
+        <span className="font-medium text-slate-900">
+          {e.spenderName || "—"}
+        </span>
+      ),
+    },
+    {
       key: "category",
       header: "Category",
+      hideOnMobile: true,
       render: (e) => (
         <Badge variant={categoryBadgeVariant[e.category] || "default"}>
           {e.category.replace(/_/g, " ")}
@@ -168,10 +180,11 @@ export default function ExpensesPage() {
         <span className="font-medium">{formatNaira(e.amount)}</span>
       ),
     },
-    { key: "description", header: "Description" },
+    { key: "description", header: "Description", hideOnMobile: true },
     {
       key: "receiptUrl",
       header: "Receipt",
+      hideOnMobile: true,
       render: (e) =>
         e.receiptUrl ? (
           <a
@@ -310,15 +323,23 @@ export default function ExpensesPage() {
         title="Add Expense"
       >
         <form onSubmit={handleAddExpense} className="space-y-4">
-          <Input
-            label="Amount (₦)"
-            name="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            required
-            placeholder="e.g. 25000"
-          />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              label="Amount (₦)"
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+              placeholder="e.g. 25000"
+            />
+            <Input
+              label="Spent By"
+              name="spenderName"
+              placeholder="e.g. John Doe"
+              required
+            />
+          </div>
           <Select
             label="Category"
             name="category"

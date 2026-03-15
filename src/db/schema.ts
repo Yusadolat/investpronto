@@ -277,6 +277,7 @@ export const expenseEntries = pgTable('expense_entries', {
   expenseDate: date('expense_date').notNull(),
   month: integer('month').notNull(),
   receiptUrl: varchar('receipt_url', { length: 512 }),
+  spenderName: varchar('spender_name', { length: 255 }),
   createdBy: uuid('created_by')
     .notNull()
     .references(() => users.id),

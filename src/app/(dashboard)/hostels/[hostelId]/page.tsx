@@ -12,6 +12,9 @@ import {
   TrendingUp,
   Users,
   Wallet,
+  ArrowRight,
+  BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 
 import { StatCard } from "@/components/ui/stat-card";
@@ -42,6 +45,7 @@ interface ExpenseRow {
   category: string;
   description: string;
   date: string;
+  spenderName: string | null;
   status: string;
 }
 
@@ -139,18 +143,18 @@ export default function HostelDashboardPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [setupModalOpen, setSetupModalOpen] = React.useState(false);
-  const [contributionModalOpen, setContributionModalOpen] = React.useState(false);
-  const [submitting, setSubmitting] = React.useState<"setup" | "capital" | null>(null);
+  const [contributionModalOpen, setContributionModalOpen] =
+    React.useState(false);
+  const [submitting, setSubmitting] = React.useState<
+    "setup" | "capital" | null
+  >(null);
 
   const fetchData = React.useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const res = await fetch(`/api/hostels/${hostelId}`);
-      if (!res.ok) {
-        throw new Error("Failed to fetch hostel data");
-      }
-
+      if (!res.ok) throw new Error("Failed to fetch hostel data");
       const json = (await res.json()) as HostelApiResponse;
       setData(json);
     } catch (err) {
@@ -167,9 +171,7 @@ export default function HostelDashboardPage() {
   async function handleAddSetupItem(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSubmitting("setup");
-
     const formData = new FormData(event.currentTarget);
-
     try {
       const res = await fetch(`/api/hostels/${hostelId}/setup-items`, {
         method: "POST",
@@ -185,15 +187,13 @@ export default function HostelDashboardPage() {
           receiptUrl: formData.get("receiptUrl"),
         }),
       });
-
-      if (!res.ok) {
-        throw new Error("Failed to add setup item");
-      }
-
+      if (!res.ok) throw new Error("Failed to add setup item");
       setSetupModalOpen(false);
       await fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add setup item");
+      setError(
+        err instanceof Error ? err.message : "Failed to add setup item"
+      );
     } finally {
       setSubmitting(null);
     }
@@ -204,31 +204,30 @@ export default function HostelDashboardPage() {
   ) {
     event.preventDefault();
     setSubmitting("capital");
-
     const formData = new FormData(event.currentTarget);
-
     try {
-      const res = await fetch(`/api/hostels/${hostelId}/capital-contributions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contributorName: formData.get("contributorName"),
-          contributorType: formData.get("contributorType"),
-          amount: Number(formData.get("amount")),
-          contributionDate: formData.get("contributionDate"),
-          notes: formData.get("notes"),
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to add capital contribution");
-      }
-
+      const res = await fetch(
+        `/api/hostels/${hostelId}/capital-contributions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contributorName: formData.get("contributorName"),
+            contributorType: formData.get("contributorType"),
+            amount: Number(formData.get("amount")),
+            contributionDate: formData.get("contributionDate"),
+            notes: formData.get("notes"),
+          }),
+        }
+      );
+      if (!res.ok) throw new Error("Failed to add capital contribution");
       setContributionModalOpen(false);
       await fetchData();
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to add capital contribution"
+        err instanceof Error
+          ? err.message
+          : "Failed to add capital contribution"
       );
     } finally {
       setSubmitting(null);
@@ -259,25 +258,48 @@ export default function HostelDashboardPage() {
   }
 
   const { hostel, dashboard, transparency } = data;
-  const statusVariant =
-    hostel.status === "active"
-      ? "success"
-      : hostel.status === "setup"
-      ? "warning"
-      : "default";
+
+  const statusConfig: Record<string, { variant: "success" | "warning" | "default"; label: string }> = {
+    active: { variant: "success", label: "Live" },
+    setup: { variant: "warning", label: "Setup Phase" },
+    inactive: { variant: "default", label: "Inactive" },
+  };
+  const statusInfo = statusConfig[hostel.status] || statusConfig.inactive;
+
+  const setupProgress =
+    transparency.summary.setup.totalBudget > 0
+      ? Math.min(
+          (transparency.summary.setup.totalRecorded /
+            transparency.summary.setup.totalBudget) *
+            100,
+          100
+        )
+      : 0;
+
+  const capitalProgress =
+    transparency.summary.setup.totalBudget > 0
+      ? Math.min(
+          (transparency.summary.capital.totalContributed /
+            transparency.summary.setup.totalBudget) *
+            100,
+          100
+        )
+      : 0;
 
   const setupColumns: Column<SetupItem>[] = [
     { key: "title", header: "Item" },
     {
       key: "category",
       header: "Category",
+      hideOnMobile: true,
       render: (item) => (
         <Badge variant="info">{item.category.replace(/_/g, " ")}</Badge>
       ),
     },
     {
       key: "costType",
-      header: "Cost Type",
+      header: "Type",
+      hideOnMobile: true,
       render: (item) => (
         <Badge variant={item.costType === "recurring" ? "warning" : "default"}>
           {item.costType === "recurring" ? "Recurring" : "One-time"}
@@ -287,17 +309,17 @@ export default function HostelDashboardPage() {
     {
       key: "amount",
       header: "Amount",
-      render: (item) => formatNaira(item.amount),
-    },
-    {
-      key: "incurredAt",
-      header: "Date",
-      render: (item) => new Date(item.incurredAt).toLocaleDateString("en-NG"),
+      render: (item) => (
+        <span className="font-semibold">{formatNaira(item.amount)}</span>
+      ),
     },
     {
       key: "vendor",
       header: "Vendor",
-      render: (item) => item.vendor || "-",
+      hideOnMobile: true,
+      render: (item) => (
+        <span className="text-slate-500">{item.vendor || "-"}</span>
+      ),
     },
   ];
 
@@ -306,55 +328,68 @@ export default function HostelDashboardPage() {
     {
       key: "contributorType",
       header: "Type",
-      render: (item) => (
-        <Badge variant="default">{item.contributorType.replace(/_/g, " ")}</Badge>
-      ),
+      render: (item) => {
+        const typeVariant: Record<string, "success" | "info" | "warning" | "default"> = {
+          founder: "success",
+          cofounder: "info",
+          investor: "warning",
+          other: "default",
+        };
+        return (
+          <Badge variant={typeVariant[item.contributorType] || "default"}>
+            {item.contributorType.replace(/_/g, " ")}
+          </Badge>
+        );
+      },
     },
     {
       key: "amount",
       header: "Amount",
-      render: (item) => formatNaira(item.amount),
+      render: (item) => (
+        <span className="font-semibold">{formatNaira(item.amount)}</span>
+      ),
     },
     {
       key: "stake",
       header: "Stake",
+      hideOnMobile: true,
       render: (item) => {
-        const capitalPercentage =
+        const pct =
           transparency.summary.setup.totalBudget > 0
             ? (item.amount / transparency.summary.setup.totalBudget) * 100
             : 0;
-        return `${capitalPercentage.toFixed(2)}%`;
+        return <span className="text-slate-600">{pct.toFixed(1)}%</span>;
       },
-    },
-    {
-      key: "contributionDate",
-      header: "Date",
-      render: (item) =>
-        new Date(item.contributionDate).toLocaleDateString("en-NG"),
     },
   ];
 
   const investorColumns: Column<InvestorRow>[] = [
     { key: "name", header: "Investor" },
-    { key: "email", header: "Email" },
+    {
+      key: "email",
+      header: "Email",
+      hideOnMobile: true,
+    },
     {
       key: "amountInvested",
       header: "Capital",
-      render: (item) => formatNaira(item.amountInvested),
-    },
-    {
-      key: "capitalPercentage",
-      header: "Capital Stake",
-      render: (item) => `${item.capitalPercentage.toFixed(2)}%`,
+      render: (item) => (
+        <span className="font-semibold">{formatNaira(item.amountInvested)}</span>
+      ),
     },
     {
       key: "profitSharePercentage",
       header: "Profit Share",
-      render: (item) => `${item.profitSharePercentage.toFixed(2)}%`,
+      render: (item) => (
+        <span className="font-medium text-emerald-700">
+          {item.profitSharePercentage.toFixed(1)}%
+        </span>
+      ),
     },
     {
       key: "agreementType",
       header: "Agreement",
+      hideOnMobile: true,
       render: (item) => (
         <Badge variant="info">{item.agreementType.replace(/_/g, " ")}</Badge>
       ),
@@ -363,13 +398,18 @@ export default function HostelDashboardPage() {
 
   const expenseColumns: Column<ExpenseRow>[] = [
     {
-      key: "date",
-      header: "Date",
-      render: (item) => new Date(item.date).toLocaleDateString("en-NG"),
+      key: "spenderName",
+      header: "Spent By",
+      render: (item) => (
+        <span className="font-medium text-slate-900">
+          {item.spenderName || "—"}
+        </span>
+      ),
     },
     {
       key: "category",
       header: "Category",
+      hideOnMobile: true,
       render: (item) => (
         <Badge variant="default">{item.category.replace(/_/g, " ")}</Badge>
       ),
@@ -377,12 +417,19 @@ export default function HostelDashboardPage() {
     {
       key: "amount",
       header: "Amount",
-      render: (item) => formatNaira(item.amount),
+      render: (item) => (
+        <span className="font-semibold">{formatNaira(item.amount)}</span>
+      ),
     },
-    { key: "description", header: "Description" },
+    {
+      key: "description",
+      header: "Description",
+      hideOnMobile: true,
+    },
     {
       key: "status",
       header: "Status",
+      hideOnMobile: true,
       render: (item) => (
         <Badge variant={item.status === "approved" ? "success" : "warning"}>
           {item.status}
@@ -392,105 +439,241 @@ export default function HostelDashboardPage() {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-gray-900">{hostel.name}</h1>
-            <Badge variant={statusVariant}>{hostel.status}</Badge>
+    <div className="space-y-8">
+      {/* ─── Hero Header ─── */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8">
+        {/* Decorative */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,130,246,0.12),transparent_60%)]" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)",
+            backgroundSize: "40px 40px",
+          }}
+        />
+
+        <div className="relative">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  {hostel.name}
+                </h1>
+                <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+              </div>
+              <p className="text-sm text-slate-400">{hostel.address}</p>
+            </div>
+
+            {/* Quick actions */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                {
+                  href: `/hostels/${hostelId}/revenue`,
+                  icon: DollarSign,
+                  label: "Revenue",
+                },
+                {
+                  href: `/hostels/${hostelId}/expenses`,
+                  icon: Receipt,
+                  label: "Expenses",
+                },
+                {
+                  href: `/hostels/${hostelId}/investors`,
+                  icon: Users,
+                  label: "Investors",
+                },
+                {
+                  href: `/hostels/${hostelId}/reports`,
+                  icon: BarChart3,
+                  label: "Reports",
+                },
+              ].map((action) => (
+                <Link key={action.href} href={action.href}>
+                  <button className="flex items-center gap-1.5 rounded-xl bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/10 px-3.5 py-2 text-xs font-medium text-white transition-all">
+                    <action.icon className="h-3.5 w-3.5" />
+                    {action.label}
+                  </button>
+                </Link>
+              ))}
+            </div>
           </div>
-          <p className="mt-1 text-sm text-gray-500">{hostel.address}</p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <Link href={`/hostels/${hostelId}/revenue`}>
-            <Button variant="outline" size="sm">
-              <DollarSign className="mr-1 h-4 w-4" /> Revenue
-            </Button>
-          </Link>
-          <Link href={`/hostels/${hostelId}/expenses`}>
-            <Button variant="outline" size="sm">
-              <Receipt className="mr-1 h-4 w-4" /> Expenses
-            </Button>
-          </Link>
-          <Link href={`/hostels/${hostelId}/investors`}>
-            <Button variant="outline" size="sm">
-              <Users className="mr-1 h-4 w-4" /> Investors
-            </Button>
-          </Link>
+
+          {/* Key metrics inside hero */}
+          <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              {
+                label: "Monthly Revenue",
+                value: formatNaira(dashboard.currentMonthRevenue),
+                color: "text-emerald-400",
+              },
+              {
+                label: "Monthly Expenses",
+                value: formatNaira(dashboard.currentMonthExpenses),
+                color: "text-amber-400",
+              },
+              {
+                label: "Net Profit",
+                value: formatNaira(dashboard.currentMonthProfit),
+                color:
+                  dashboard.currentMonthProfit >= 0
+                    ? "text-emerald-400"
+                    : "text-rose-400",
+              },
+              {
+                label: "Investors",
+                value: String(dashboard.investorCount),
+                color: "text-blue-400",
+              },
+            ].map((metric) => (
+              <div key={metric.label}>
+                <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
+                  {metric.label}
+                </p>
+                <p
+                  className={`mt-1 text-lg sm:text-xl font-bold ${metric.color}`}
+                >
+                  {metric.value}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+        <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
           {error}
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Setup Budget"
-          value={formatNaira(transparency.summary.setup.totalBudget)}
-          icon={<Building2 className="h-5 w-5" />}
-          subtitle="Target project setup cost"
-        />
-        <StatCard
-          title="Recorded Setup Spend"
-          value={formatNaira(transparency.summary.setup.totalRecorded)}
-          icon={<Receipt className="h-5 w-5" />}
-          subtitle="All setup line items"
-        />
-        <StatCard
-          title="Total Capital Raised"
-          value={formatNaira(transparency.summary.capital.totalContributed)}
-          icon={<CreditCard className="h-5 w-5" />}
-          subtitle="Founders + investors"
-        />
-        <StatCard
-          title="Current Month Profit"
-          value={formatNaira(dashboard.currentMonthProfit)}
-          icon={<TrendingUp className="h-5 w-5" />}
-          subtitle="Verified revenue minus approved expenses"
-        />
+      {/* ─── Setup & Capital Progress ─── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Setup Budget Progress */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-2">
+            <div>
+              <CardTitle>Setup Budget</CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                {formatNaira(transparency.summary.setup.totalRecorded)} of{" "}
+                {formatNaira(transparency.summary.setup.totalBudget)} spent
+              </p>
+            </div>
+            <span className="text-lg font-bold text-slate-900">
+              {setupProgress.toFixed(0)}%
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-700"
+                style={{ width: `${setupProgress}%` }}
+              />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">One-time</p>
+                <p className="mt-0.5 text-sm font-bold text-slate-900">
+                  {formatNaira(transparency.summary.setup.oneTimeTotal)}
+                </p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-3">
+                <p className="text-xs text-slate-500">Recurring</p>
+                <p className="mt-0.5 text-sm font-bold text-slate-900">
+                  {formatNaira(transparency.summary.setup.recurringTotal)}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Capital Raised Progress */}
+        <Card>
+          <CardHeader className="flex flex-row items-start justify-between gap-2">
+            <div>
+              <CardTitle>Capital Raised</CardTitle>
+              <p className="mt-1 text-sm text-slate-500">
+                {formatNaira(transparency.summary.capital.totalContributed)} of{" "}
+                {formatNaira(transparency.summary.setup.totalBudget)} target
+              </p>
+            </div>
+            <span className="text-lg font-bold text-slate-900">
+              {capitalProgress.toFixed(0)}%
+            </span>
+          </CardHeader>
+          <CardContent>
+            <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 transition-all duration-700"
+                style={{ width: `${capitalProgress}%` }}
+              />
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {[
+                {
+                  label: "Founders",
+                  value:
+                    transparency.summary.capital.founderCapital +
+                    transparency.summary.capital.cofounderCapital,
+                  dot: "bg-emerald-500",
+                },
+                {
+                  label: "Investors",
+                  value: transparency.summary.capital.investorCapital,
+                  dot: "bg-blue-500",
+                },
+                {
+                  label: transparency.summary.capital.fundingGap > 0 ? "Funding Gap" : "Excess",
+                  value:
+                    transparency.summary.capital.fundingGap > 0
+                      ? transparency.summary.capital.fundingGap
+                      : transparency.summary.capital.excessCapital,
+                  dot:
+                    transparency.summary.capital.fundingGap > 0
+                      ? "bg-amber-500"
+                      : "bg-violet-500",
+                },
+                {
+                  label: "Investors",
+                  value: dashboard.investorCount,
+                  isCount: true,
+                  dot: "bg-slate-400",
+                },
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 rounded-xl bg-slate-50 p-3">
+                  <div className={`h-2 w-2 rounded-full ${item.dot}`} />
+                  <div>
+                    <p className="text-xs text-slate-500">{item.label}</p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {"isCount" in item && item.isCount
+                        ? String(item.value)
+                        : formatNaira(item.value as number)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="One-time Setup"
-          value={formatNaira(transparency.summary.setup.oneTimeTotal)}
-          icon={<Wallet className="h-5 w-5" />}
-          subtitle="Non-recurring build costs"
-        />
-        <StatCard
-          title="Recurring Setup"
-          value={formatNaira(transparency.summary.setup.recurringTotal)}
-          icon={<Wallet className="h-5 w-5" />}
-          subtitle="Ongoing setup-linked costs"
-        />
-        <StatCard
-          title="Funding Gap"
-          value={formatNaira(transparency.summary.capital.fundingGap)}
-          icon={<Wallet className="h-5 w-5" />}
-          subtitle="Budget minus contributed capital"
-        />
-        <StatCard
-          title="Investors"
-          value={String(dashboard.investorCount)}
-          icon={<Users className="h-5 w-5" />}
-          subtitle="Active investor members"
-        />
-      </div>
-
+      {/* ─── Setup Transparency ─── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Setup Transparency</CardTitle>
-            <p className="mt-1 text-sm text-gray-500">
-              Every item used to build the hostel network, including one-time and recurring costs.
+            <p className="mt-1 text-sm text-slate-500">
+              Line items showing how setup funds were spent
             </p>
           </div>
-          <Button onClick={() => setSetupModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Setup Item
+          <Button
+            onClick={() => setSetupModalOpen(true)}
+            size="sm"
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add Item
           </Button>
         </CardHeader>
         <CardContent>
@@ -499,7 +682,7 @@ export default function HostelDashboardPage() {
           ) : (
             <EmptyState
               title="No setup items recorded"
-              description="Add the line items used to build this hostel so investors can see exactly how setup funds were spent."
+              description="Add line items so investors can see exactly how setup funds were spent."
               icon={<Receipt className="h-6 w-6" />}
               action={{
                 label: "Add Setup Item",
@@ -510,43 +693,25 @@ export default function HostelDashboardPage() {
         </CardContent>
       </Card>
 
+      {/* ─── Capital Stack ─── */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Capital Stack</CardTitle>
-            <p className="mt-1 text-sm text-gray-500">
-              Record who funded the hostel so every stakeholder can see their capital position.
+            <p className="mt-1 text-sm text-slate-500">
+              Who funded the hostel and their capital position
             </p>
           </div>
-          <Button onClick={() => setContributionModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
+          <Button
+            onClick={() => setContributionModalOpen(true)}
+            size="sm"
+            className="w-full sm:w-auto"
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
             Add Contribution
           </Button>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              title="Founder Capital"
-              value={formatNaira(transparency.summary.capital.founderCapital)}
-              subtitle="Primary founder contribution"
-            />
-            <StatCard
-              title="Co-founder Capital"
-              value={formatNaira(transparency.summary.capital.cofounderCapital)}
-              subtitle="Co-founder contribution"
-            />
-            <StatCard
-              title="Investor Capital"
-              value={formatNaira(transparency.summary.capital.investorCapital)}
-              subtitle="External investor funding"
-            />
-            <StatCard
-              title="Excess Capital"
-              value={formatNaira(transparency.summary.capital.excessCapital)}
-              subtitle="Capital above setup budget"
-            />
-          </div>
-
+        <CardContent>
           {transparency.capitalContributions.length > 0 ? (
             <DataTable
               columns={contributionColumns}
@@ -554,7 +719,7 @@ export default function HostelDashboardPage() {
             />
           ) : (
             <EmptyState
-              title="No capital contributions recorded"
+              title="No contributions recorded"
               description="Add founder, co-founder, and investor contributions to show the full capital stack."
               icon={<CreditCard className="h-6 w-6" />}
               action={{
@@ -566,108 +731,147 @@ export default function HostelDashboardPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Investor Stake and Profit Share</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dashboard.investors.length > 0 ? (
-            <DataTable columns={investorColumns} data={dashboard.investors} />
-          ) : (
-            <EmptyState
-              title="No investors yet"
-              description="Invite investors to create agreements and expose their stake in the hostel."
-              icon={<Users className="h-6 w-6" />}
-              action={{
-                label: "Manage Investors",
-                onClick: () => {
-                  window.location.href = `/hostels/${hostelId}/investors`;
-                },
-              }}
-            />
-          )}
-        </CardContent>
-      </Card>
+      {/* ─── Investors & Expenses (Side by Side on Desktop) ─── */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Investor Stakes</CardTitle>
+            <Link href={`/hostels/${hostelId}/investors`}>
+              <button className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                View all <ArrowRight className="h-3 w-3" />
+              </button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {dashboard.investors.length > 0 ? (
+              <DataTable
+                columns={investorColumns}
+                data={dashboard.investors}
+              />
+            ) : (
+              <EmptyState
+                title="No investors yet"
+                description="Invite investors to this hostel."
+                icon={<Users className="h-6 w-6" />}
+                action={{
+                  label: "Manage Investors",
+                  onClick: () => {
+                    window.location.href = `/hostels/${hostelId}/investors`;
+                  },
+                }}
+              />
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Approved and Pending Expenses</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {dashboard.recentExpenses.length > 0 ? (
-            <DataTable columns={expenseColumns} data={dashboard.recentExpenses} />
-          ) : (
-            <EmptyState
-              title="No expenses recorded"
-              description="Monthly operating expenses will show here once they are logged."
-              icon={<Receipt className="h-6 w-6" />}
-            />
-          )}
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Expenses</CardTitle>
+            <Link href={`/hostels/${hostelId}/expenses`}>
+              <button className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                View all <ArrowRight className="h-3 w-3" />
+              </button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {dashboard.recentExpenses.length > 0 ? (
+              <DataTable
+                columns={expenseColumns}
+                data={dashboard.recentExpenses}
+              />
+            ) : (
+              <EmptyState
+                title="No expenses recorded"
+                description="Expenses will appear once they are logged."
+                icon={<Receipt className="h-6 w-6" />}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
+      {/* ─── Setup Item Modal ─── */}
       <Modal
         open={setupModalOpen}
         onClose={() => setSetupModalOpen(false)}
         title="Add Setup Item"
       >
         <form onSubmit={handleAddSetupItem} className="space-y-4">
-          <Input label="Item title" name="title" required placeholder="Core router" />
+          <Input
+            label="Item title"
+            name="title"
+            required
+            placeholder="Core router"
+          />
           <Input
             label="Description"
             name="description"
             placeholder="What was purchased and why"
           />
-          <Select
-            label="Category"
-            name="category"
-            options={setupCategoryOptions}
-            defaultValue="hardware"
-            required
-          />
-          <Select
-            label="Cost type"
-            name="costType"
-            options={setupCostTypeOptions}
-            defaultValue="one_time"
-            required
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Select
+              label="Category"
+              name="category"
+              options={setupCategoryOptions}
+              defaultValue="hardware"
+              required
+            />
+            <Select
+              label="Cost type"
+              name="costType"
+              options={setupCostTypeOptions}
+              defaultValue="one_time"
+              required
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Amount"
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+            />
+            <Input
+              label="Date"
+              name="incurredAt"
+              type="date"
+              defaultValue={new Date().toISOString().split("T")[0]}
+              required
+            />
+          </div>
           <Input
-            label="Amount (NGN)"
-            name="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            required
+            label="Vendor"
+            name="vendor"
+            placeholder="Supplier or contractor"
           />
-          <Input
-            label="Date incurred"
-            name="incurredAt"
-            type="date"
-            defaultValue={new Date().toISOString().split("T")[0]}
-            required
-          />
-          <Input label="Vendor" name="vendor" placeholder="Supplier or contractor" />
           <Input
             label="Receipt URL"
             name="receiptUrl"
             placeholder="https://..."
           />
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setSetupModalOpen(false)}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" loading={submitting === "setup"}>
+            <Button
+              type="submit"
+              loading={submitting === "setup"}
+              className="w-full sm:w-auto"
+            >
               Save Item
             </Button>
           </div>
         </form>
       </Modal>
 
+      {/* ─── Capital Contribution Modal ─── */}
       <Modal
         open={contributionModalOpen}
         onClose={() => setContributionModalOpen(false)}
@@ -687,35 +891,42 @@ export default function HostelDashboardPage() {
             defaultValue="founder"
             required
           />
-          <Input
-            label="Amount (NGN)"
-            name="amount"
-            type="number"
-            min="0"
-            step="0.01"
-            required
-          />
-          <Input
-            label="Contribution date"
-            name="contributionDate"
-            type="date"
-            defaultValue={new Date().toISOString().split("T")[0]}
-            required
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Amount"
+              name="amount"
+              type="number"
+              min="0"
+              step="0.01"
+              required
+            />
+            <Input
+              label="Date"
+              name="contributionDate"
+              type="date"
+              defaultValue={new Date().toISOString().split("T")[0]}
+              required
+            />
+          </div>
           <Input
             label="Notes"
             name="notes"
             placeholder="Optional explanation"
           />
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
             <Button
               type="button"
               variant="outline"
               onClick={() => setContributionModalOpen(false)}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button type="submit" loading={submitting === "capital"}>
+            <Button
+              type="submit"
+              loading={submitting === "capital"}
+              className="w-full sm:w-auto"
+            >
               Save Contribution
             </Button>
           </div>

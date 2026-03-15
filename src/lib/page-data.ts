@@ -18,6 +18,7 @@ export interface ExpensePageRow {
   description: string;
   expenseDate: string;
   receiptUrl: string | null;
+  spenderName: string | null;
   approvalStatus: string;
   monthKey: number;
 }
@@ -84,6 +85,7 @@ export function normalizeExpensesResponse(payload: Record<string, unknown>): Exp
       description: String(row.description || ""),
       expenseDate: String(row.expenseDate || ""),
       receiptUrl: row.receiptUrl ? String(row.receiptUrl) : null,
+      spenderName: row.spenderName ? String(row.spenderName) : null,
       approvalStatus: String(row.approvalStatus || "approved"),
       monthKey: Number(row.month || row.monthKey || 0),
     };

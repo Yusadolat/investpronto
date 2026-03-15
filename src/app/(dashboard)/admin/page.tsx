@@ -143,22 +143,33 @@ export default function AdminDashboardPage() {
   if (!data) return null;
 
   const hostelColumns: Column<HostelSummary>[] = [
-    { key: "name", header: "Hostel" },
+    {
+      key: "name",
+      header: "Hostel",
+      render: (h) => (
+        <span className="font-semibold text-slate-900">{h.name}</span>
+      ),
+    },
     {
       key: "revenue",
       header: "Revenue",
-      render: (h) => formatNaira(h.revenue),
+      render: (h) => (
+        <span className="font-medium">{formatNaira(h.revenue)}</span>
+      ),
     },
     {
       key: "expenses",
       header: "Expenses",
+      hideOnMobile: true,
       render: (h) => formatNaira(h.expenses),
     },
     {
       key: "profit",
       header: "Profit",
       render: (h) => (
-        <span className={h.profit >= 0 ? "text-green-600" : "text-red-600"}>
+        <span
+          className={`font-semibold ${h.profit >= 0 ? "text-emerald-600" : "text-rose-600"}`}
+        >
           {formatNaira(h.profit)}
         </span>
       ),
@@ -166,6 +177,7 @@ export default function AdminDashboardPage() {
     {
       key: "status",
       header: "Status",
+      hideOnMobile: true,
       render: (h) => (
         <Badge
           variant={
@@ -186,9 +198,9 @@ export default function AdminDashboardPage() {
       render: (h) => (
         <Link
           href={`/hostels/${h.id}`}
-          className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+          className="inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
         >
-          View <ChevronRight className="ml-1 h-4 w-4" />
+          View <ChevronRight className="ml-0.5 h-3.5 w-3.5" />
         </Link>
       ),
     },
@@ -199,44 +211,49 @@ export default function AdminDashboardPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="mt-1 text-sm text-gray-500">{today}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">{today}</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <Link href="/hostels/new">
-            <Button>
+            <Button className="w-full sm:w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Add Hostel
             </Button>
           </Link>
           <Link href="/reports">
-            <Button variant="outline">
+            <Button variant="outline" className="w-full sm:w-auto">
               <FileText className="mr-2 h-4 w-4" />
-              View Reports
+              Reports
             </Button>
           </Link>
         </div>
       </div>
 
       {/* Stat Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Hostels"
           value={String(data.totals.hostelCount)}
           icon={<Building2 className="h-5 w-5" />}
           subtitle="Active properties"
+          variant="blue"
         />
         <StatCard
           title="Total Revenue"
           value={formatNaira(data.totals.totalRevenue)}
           icon={<DollarSign className="h-5 w-5" />}
           subtitle="This month"
+          variant="emerald"
         />
         <StatCard
           title="Total Expenses"
           value={formatNaira(data.totals.totalExpenses)}
           icon={<TrendingUp className="h-5 w-5" />}
           subtitle="This month"
+          variant="amber"
         />
         <StatCard
           title="Net Profit"
@@ -247,33 +264,42 @@ export default function AdminDashboardPage() {
             positive: data.totals.netProfit >= 0,
           }}
           subtitle="vs last month"
+          variant={data.totals.netProfit >= 0 ? "emerald" : "rose"}
         />
       </div>
 
       {/* Revenue vs Expenses Chart */}
       <Card>
         <CardHeader>
-          <CardTitle>Revenue vs Expenses (Last 6 Months)</CardTitle>
+          <CardTitle>Revenue vs Expenses</CardTitle>
+          <p className="text-sm text-slate-500">Last 6 months performance overview</p>
         </CardHeader>
         <CardContent>
           {data.chartData.length > 0 ? (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                <BarChart data={data.chartData} barGap={4}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                   <YAxis
-                    tick={{ fontSize: 12 }}
+                    tick={{ fontSize: 12, fill: "#94a3b8" }}
+                    axisLine={false}
+                    tickLine={false}
                     tickFormatter={(v) =>
                       `₦${(v / 1000).toFixed(0)}k`
                     }
                   />
                   <Tooltip
                     formatter={(value) => formatNaira(Number(value))}
-                    labelStyle={{ color: "#374151" }}
+                    labelStyle={{ color: "#0f172a", fontWeight: 600 }}
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "1px solid #e2e8f0",
+                      boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
+                    }}
                   />
-                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill="#f97316" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="expenses" name="Expenses" fill="#f59e0b" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -291,9 +317,9 @@ export default function AdminDashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Hostel Performance</CardTitle>
           <Link href="/hostels">
-            <Button variant="ghost" size="sm">
-              View all <ChevronRight className="ml-1 h-4 w-4" />
-            </Button>
+            <button className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors">
+              View all <ChevronRight className="h-3 w-3" />
+            </button>
           </Link>
         </CardHeader>
         <CardContent>

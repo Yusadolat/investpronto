@@ -1,6 +1,7 @@
 "use client";
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { X } from "lucide-react";
 
 interface ModalProps {
   open: boolean;
@@ -30,9 +31,9 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div
-        className="fixed inset-0 bg-black/50 transition-opacity"
+        className="fixed inset-0 bg-black/40 backdrop-blur-[2px] transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -41,25 +42,29 @@ function Modal({ open, onClose, title, children, className }: ModalProps) {
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "relative z-50 w-full max-w-lg rounded-xl bg-white p-6 shadow-xl",
-          "animate-in fade-in zoom-in-95 duration-200",
+          "relative z-50 w-full sm:max-w-lg bg-white shadow-2xl",
+          "rounded-t-2xl sm:rounded-2xl",
+          "max-h-[90vh] sm:max-h-[85vh] overflow-y-auto",
+          "p-5 sm:p-6",
           className
         )}
       >
         {title && (
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <div className="mb-5 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
             <button
               onClick={onClose}
-              className="rounded-lg p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+              className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
               aria-label="Close"
             >
-              <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
-              </svg>
+              <X className="h-5 w-5" />
             </button>
           </div>
         )}
+        {/* Drag indicator on mobile */}
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 sm:hidden">
+          <div className="h-1 w-8 rounded-full bg-slate-200" />
+        </div>
         {children}
       </div>
     </div>

@@ -5,11 +5,14 @@ import {
   memberships,
   investmentAgreements,
   invitations,
+  hostels,
 } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 import { logAudit } from '@/lib/audit';
-import { generateInviteToken } from '@/lib/utils';
+import { generateInviteToken, formatNaira } from '@/lib/utils';
+import { sendEmail } from '@/lib/email';
+import { investorInvitationEmail } from '@/lib/email-templates';
 import crypto from 'crypto';
 
 export async function GET(request: NextRequest) {
@@ -163,6 +166,35 @@ export async function POST(request: NextRequest) {
       entityType: 'investor',
       entityId: investorUserId,
       details: { email, amountInvested, agreementType, percentageShare },
+    });
+
+    // Fetch hostel name and inviter name for the email
+    const [hostel] = await db
+      .select({ name: hostels.name })
+      .from(hostels)
+      .where(eq(hostels.id, hostelId))
+      .limit(1);
+
+    const [inviter] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, ctx.userId))
+      .limit(1);
+
+    const emailData = investorInvitationEmail({
+      hostelName: hostel?.name || 'a property',
+      inviterName: inviter?.name || 'The admin',
+      token,
+      amountInvested: formatNaira(amountInvested),
+      percentageShare: String(percentageShare),
+      agreementType,
+    });
+
+    await sendEmail({
+      to: { address: email },
+      subject: emailData.subject,
+      htmlBody: emailData.htmlBody,
+      textBody: emailData.textBody,
     });
 
     return NextResponse.json(

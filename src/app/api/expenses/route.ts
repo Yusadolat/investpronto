@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { hostelId, amount, category, description, expenseDate, receiptUrl } = body;
+    const { hostelId, amount, category, description, expenseDate, receiptUrl, spenderName } = body;
 
     if (!hostelId || amount == null || !category || !description || !expenseDate) {
       return NextResponse.json(
@@ -68,6 +68,7 @@ export async function POST(request: NextRequest) {
         expenseDate,
         month,
         receiptUrl: receiptUrl || null,
+        spenderName: spenderName || null,
         createdBy: ctx.userId,
         approvalStatus: 'pending',
       })
@@ -79,7 +80,7 @@ export async function POST(request: NextRequest) {
       action: 'create',
       entityType: 'expense_entry',
       entityId: entry.id,
-      details: { amount, category, description, expenseDate, month },
+      details: { amount, category, description, expenseDate, month, spenderName },
     });
 
     return NextResponse.json({ expense: entry }, { status: 201 });

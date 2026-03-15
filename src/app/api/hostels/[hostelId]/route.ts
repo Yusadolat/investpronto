@@ -111,6 +111,7 @@ export async function GET(
         category: expenseEntries.category,
         description: expenseEntries.description,
         date: expenseEntries.expenseDate,
+        spenderName: expenseEntries.spenderName,
         status: expenseEntries.approvalStatus,
       })
       .from(expenseEntries)
