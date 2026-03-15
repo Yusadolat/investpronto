@@ -21,6 +21,10 @@ import {
   PieChart,
   Mail,
   UserPlus,
+  RefreshCw,
+  Trash2,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 
 interface Investor {
@@ -34,6 +38,17 @@ interface Investor {
   percentageShare: number;
   status: string;
   notes: string;
+}
+
+interface Invitation {
+  id: string;
+  email: string;
+  role: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  createdAt: string;
+  inviterName: string;
+  hostelName: string;
 }
 
 const agreementOptions = [
@@ -78,6 +93,9 @@ export default function InvestorsPage() {
     React.useState<Investor | null>(null);
   const [inviteTab, setInviteTab] = React.useState<InviteTab>("investor");
   const [inviteSuccess, setInviteSuccess] = React.useState<string | null>(null);
+  const [pendingInvitations, setPendingInvitations] = React.useState<Invitation[]>([]);
+  const [resendingId, setResendingId] = React.useState<string | null>(null);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
   const fetchInvestors = React.useCallback(async () => {
     setLoading(true);
@@ -94,9 +112,21 @@ export default function InvestorsPage() {
     }
   }, [hostelId]);
 
+  const fetchInvitations = React.useCallback(async () => {
+    try {
+      const res = await fetch(`/api/invitations?hostelId=${hostelId}`);
+      if (!res.ok) return;
+      const json = await res.json();
+      setPendingInvitations(json.invitations || []);
+    } catch {
+      // Non-critical — don't block the page
+    }
+  }, [hostelId]);
+
   React.useEffect(() => {
     fetchInvestors();
-  }, [fetchInvestors]);
+    fetchInvitations();
+  }, [fetchInvestors, fetchInvitations]);
 
   async function handleInviteInvestor(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -125,6 +155,7 @@ export default function InvestorsPage() {
         `Invitation sent to ${payload.email}`
       );
       await fetchInvestors();
+      await fetchInvitations();
       setTimeout(() => {
         setModalOpen(false);
         setInviteSuccess(null);
@@ -160,6 +191,7 @@ export default function InvestorsPage() {
       setInviteSuccess(
         `Invitation sent to ${payload.email}`
       );
+      await fetchInvitations();
       setTimeout(() => {
         setModalOpen(false);
         setInviteSuccess(null);
@@ -170,6 +202,36 @@ export default function InvestorsPage() {
       );
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleResendInvitation(invitationId: string) {
+    setResendingId(invitationId);
+    try {
+      const res = await fetch(`/api/invitations/${invitationId}/resend`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to resend invitation");
+      await fetchInvitations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to resend");
+    } finally {
+      setResendingId(null);
+    }
+  }
+
+  async function handleDeleteInvitation(invitationId: string) {
+    setDeletingId(invitationId);
+    try {
+      const res = await fetch(`/api/invitations/${invitationId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete invitation");
+      await fetchInvitations();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -356,6 +418,113 @@ export default function InvestorsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pending Invitations */}
+      {pendingInvitations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Invitations</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="divide-y divide-slate-100">
+              {pendingInvitations.map((inv) => {
+                const isExpired = new Date(inv.expiresAt) < new Date();
+                const isAccepted = !!inv.acceptedAt;
+                const roleLabel =
+                  inv.role === "investor"
+                    ? "Investor"
+                    : inv.role === "admin"
+                    ? "Co-Founder"
+                    : "Operator";
+
+                return (
+                  <div
+                    key={inv.id}
+                    className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-slate-900 truncate">
+                          {inv.email}
+                        </span>
+                        <Badge
+                          variant={
+                            inv.role === "investor"
+                              ? "info"
+                              : inv.role === "admin"
+                              ? "success"
+                              : "warning"
+                          }
+                        >
+                          {roleLabel}
+                        </Badge>
+                        {isAccepted ? (
+                          <Badge variant="success">
+                            <CheckCircle2 className="mr-1 h-3 w-3" />
+                            Accepted
+                          </Badge>
+                        ) : isExpired ? (
+                          <Badge variant="error">Expired</Badge>
+                        ) : (
+                          <Badge variant="warning">
+                            <Clock className="mr-1 h-3 w-3" />
+                            Pending
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Invited by {inv.inviterName} on{" "}
+                        {new Date(inv.createdAt).toLocaleDateString("en-NG", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                        {!isAccepted && (
+                          <>
+                            {" "}· Expires{" "}
+                            {new Date(inv.expiresAt).toLocaleDateString(
+                              "en-NG",
+                              {
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )}
+                          </>
+                        )}
+                      </p>
+                    </div>
+
+                    {!isAccepted && (
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleResendInvitation(inv.id)}
+                          loading={resendingId === inv.id}
+                          className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300 hover:bg-blue-50"
+                        >
+                          <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                          Resend
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeleteInvitation(inv.id)}
+                          loading={deletingId === inv.id}
+                          className="text-rose-600 hover:text-rose-700 border-rose-200 hover:border-rose-300 hover:bg-rose-50"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          Delete
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Invite Modal — Tabbed for Investor / Co-Founder */}
       <Modal
