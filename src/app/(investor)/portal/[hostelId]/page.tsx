@@ -4,15 +4,21 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import {
+  ArrowDown,
   ArrowLeft,
+  Building2,
   Calendar,
   Clock,
   DollarSign,
   FileText,
+  Percent,
   PieChart,
   Receipt,
+  RefreshCw,
+  ShieldCheck,
   TrendingDown,
   TrendingUp,
+  Users,
   Wallet,
 } from "lucide-react";
 import {
@@ -90,6 +96,27 @@ interface CapitalContribution {
   contributionDate: string;
 }
 
+interface ProfitSharingConfig {
+  config: {
+    companySharePercent: number;
+    ownerSharePercent: number;
+    investorPoolPercent: number;
+    reserveFundPercent: number;
+    minimumPayoutAmount: number;
+  };
+  recurringCosts: Array<{
+    id: string;
+    name: string;
+    monthlyAmount: number;
+    isActive: boolean;
+  }>;
+  totalMonthlyRecurringCosts: number;
+  investorAgreements: {
+    count: number;
+    totalShareAllocated: number;
+  };
+}
+
 interface HostelTransparencyResponse {
   hostel: {
     name: string;
@@ -145,6 +172,7 @@ export default function InvestorHostelDetailPage() {
   const [data, setData] = useState<InvestorData | null>(null);
   const [hostelData, setHostelData] =
     useState<HostelTransparencyResponse | null>(null);
+  const [profitConfig, setProfitConfig] = useState<ProfitSharingConfig | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -152,9 +180,10 @@ export default function InvestorHostelDetailPage() {
       if (!session?.user?.id) return;
 
       try {
-        const [investorRes, hostelRes] = await Promise.all([
+        const [investorRes, hostelRes, profitRes] = await Promise.all([
           fetch(`/api/investors/${session.user.id}?hostelId=${hostelId}`),
           fetch(`/api/hostels/${hostelId}`),
+          fetch(`/api/hostels/${hostelId}/profit-sharing`),
         ]);
 
         if (investorRes.ok) {
@@ -166,6 +195,11 @@ export default function InvestorHostelDetailPage() {
           const hostelPayload =
             (await hostelRes.json()) as HostelTransparencyResponse;
           setHostelData(hostelPayload);
+        }
+
+        if (profitRes.ok) {
+          const profitData = (await profitRes.json()) as ProfitSharingConfig;
+          setProfitConfig(profitData);
         }
       } catch {
         // network error
@@ -204,9 +238,19 @@ export default function InvestorHostelDetailPage() {
   const grossRevenue = currentMonth?.grossRevenue || 0;
   const totalExpenses = currentMonth?.totalExpenses || 0;
   const netProfit = currentMonth?.netProfit || 0;
+
+  // Calculate expected payout using the waterfall
+  const pc = profitConfig?.config;
+  const recurringCostsTotal = profitConfig?.totalMonthlyRecurringCosts || 0;
+  const operatingProfit = netProfit - recurringCostsTotal;
+  const reserveAmount = Math.max(0, operatingProfit * ((pc?.reserveFundPercent || 0) / 100));
+  const distributableProfit = Math.max(0, operatingProfit - reserveAmount);
+  const investorPoolTotal = distributableProfit * ((pc?.investorPoolPercent || 100) / 100);
+  const companyShareAmount = distributableProfit * ((pc?.companySharePercent || 0) / 100);
+  const ownerShareAmount = distributableProfit * ((pc?.ownerSharePercent || 0) / 100);
   const expectedPayout = Math.max(
     0,
-    netProfit * ((agreement?.percentageShare || 0) / 100)
+    investorPoolTotal * ((agreement?.percentageShare || 0) / 100)
   );
   const capitalStake =
     hostelData.transparency.summary.setup.totalBudget > 0
@@ -601,6 +645,125 @@ export default function InvestorHostelDetailPage() {
                   </p>
                 </div>
               ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Profit Distribution Waterfall — Full Transparency */}
+      {profitConfig && netProfit !== 0 && (
+        <Card className="mb-8 overflow-hidden">
+          <div className="h-1 bg-gradient-to-r from-blue-500 via-amber-400 to-emerald-500" />
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Percent className="h-4 w-4 text-slate-700" />
+              <CardTitle className="font-display">How Your Returns Are Calculated</CardTitle>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">
+              Full breakdown of how this month&apos;s net profit is distributed
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-0">
+              {/* Net Profit */}
+              <div className="flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3">
+                <span className="text-sm font-semibold text-white">Net Profit (Revenue − Expenses)</span>
+                <span className="font-display text-base font-bold text-white">{formatNaira(netProfit)}</span>
+              </div>
+
+              {/* Recurring costs */}
+              {recurringCostsTotal > 0 && (
+                <div className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-3.5 w-3.5 text-rose-500" />
+                    <span className="text-sm text-rose-700">
+                      Recurring Costs
+                      <span className="text-rose-400 ml-1 text-xs">
+                        ({profitConfig.recurringCosts.filter(c => c.isActive).map(c => c.name).join(", ")})
+                      </span>
+                    </span>
+                  </div>
+                  <span className="font-display text-sm font-bold text-rose-700">−{formatNaira(recurringCostsTotal)}</span>
+                </div>
+              )}
+
+              {/* Operating profit */}
+              <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="text-sm font-semibold text-slate-900">Operating Profit</span>
+                <span className="font-display text-sm font-bold text-slate-900">{formatNaira(operatingProfit)}</span>
+              </div>
+
+              {/* Reserve fund */}
+              {(pc?.reserveFundPercent || 0) > 0 && (
+                <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-3.5 w-3.5 text-violet-500" />
+                    <span className="text-sm text-violet-700">Reserve Fund ({pc?.reserveFundPercent}%)</span>
+                  </div>
+                  <span className="font-display text-sm font-bold text-violet-700">−{formatNaira(reserveAmount)}</span>
+                </div>
+              )}
+
+              {/* Distributable */}
+              <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                <span className="text-sm font-semibold text-emerald-800">Distributable Profit</span>
+                <span className="font-display text-sm font-bold text-emerald-800">{formatNaira(distributableProfit)}</span>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex justify-center py-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                  <ArrowDown className="h-4 w-4 text-slate-400" />
+                </div>
+              </div>
+
+              {/* Distribution split */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(pc?.companySharePercent || 0) > 0 && (
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1.5">
+                      <Building2 className="h-3.5 w-3.5 text-blue-600" />
+                      <span className="text-[10px] font-semibold text-blue-600 uppercase tracking-wider">Platform Fee</span>
+                    </div>
+                    <p className="font-display text-lg font-bold text-blue-900">{formatNaira(companyShareAmount)}</p>
+                    <p className="text-[11px] text-blue-400 mt-0.5">{pc?.companySharePercent}%</p>
+                  </div>
+                )}
+                {(pc?.ownerSharePercent || 0) > 0 && (
+                  <div className="rounded-xl border border-slate-300 bg-slate-50 p-4 text-center">
+                    <div className="flex items-center justify-center gap-1.5 mb-1.5">
+                      <Users className="h-3.5 w-3.5 text-slate-700" />
+                      <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Owner</span>
+                    </div>
+                    <p className="font-display text-lg font-bold text-slate-900">{formatNaira(ownerShareAmount)}</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{pc?.ownerSharePercent}%</p>
+                  </div>
+                )}
+                <div className="rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-center relative">
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                    <span className="bg-amber-400 text-slate-900 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">
+                      Your pool
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-center gap-1.5 mb-1.5 mt-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-amber-600" />
+                    <span className="text-[10px] font-semibold text-amber-600 uppercase tracking-wider">Investor Pool</span>
+                  </div>
+                  <p className="font-display text-lg font-bold text-amber-900">{formatNaira(investorPoolTotal)}</p>
+                  <p className="text-[11px] text-amber-500 mt-0.5">{pc?.investorPoolPercent}%</p>
+                </div>
+              </div>
+
+              {/* Your specific share */}
+              <div className="mt-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Share ({agreement?.percentageShare || 0}% of Investor Pool)</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {formatNaira(investorPoolTotal)} × {agreement?.percentageShare || 0}%
+                  </p>
+                </div>
+                <p className="font-display text-2xl font-bold text-amber-400">{formatNaira(expectedPayout)}</p>
+              </div>
             </div>
           </CardContent>
         </Card>
