@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { InvestorNav } from "@/components/investor/investor-nav";
 
 export default async function InvestorLayout({
   children,
@@ -19,35 +19,8 @@ export default async function InvestorLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/portal" className="text-lg font-bold text-gray-900">
-            InvestPronto
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <span className="hidden text-sm text-gray-600 sm:inline">
-              {session.user.name}
-            </span>
-            <form
-              action={async () => {
-                "use server";
-                const { signOut } = await import("@/lib/auth");
-                await signOut({ redirectTo: "/login" });
-              }}
-            >
-              <button
-                type="submit"
-                className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900"
-              >
-                Logout
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
+    <div className="min-h-screen bg-slate-50">
+      <InvestorNav user={{ name: session.user.name || "Investor", email: session.user.email || "" }} />
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>

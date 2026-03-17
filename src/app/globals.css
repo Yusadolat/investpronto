@@ -1,1 +1,124 @@
 @import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-jakarta), "Plus Jakarta Sans", system-ui, sans-serif;
+
+  --color-navy-950: #060a14;
+  --color-navy-900: #0c1222;
+  --color-navy-800: #131b2e;
+  --color-navy-700: #1a2540;
+  --color-navy-600: #243155;
+
+  --color-gold-50: #fefce8;
+  --color-gold-100: #fef9c3;
+  --color-gold-200: #fef08a;
+  --color-gold-300: #fde047;
+  --color-gold-400: #facc15;
+  --color-gold-500: #eab308;
+  --color-gold-600: #ca8a04;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes progress-fill {
+  from { width: 0%; }
+}
+
+@keyframes count-up {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-slide-in {
+  animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-progress {
+  animation: progress-fill 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+.stagger-7 { animation-delay: 0.35s; }
+.stagger-8 { animation-delay: 0.4s; }
+
+/* Custom recharts tooltip styling */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background: #0c1222 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  padding: 12px 16px !important;
+}
+
+.recharts-tooltip-wrapper .recharts-tooltip-label {
+  color: #94a3b8 !important;
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  margin-bottom: 6px !important;
+}
+
+.recharts-tooltip-wrapper .recharts-tooltip-item {
+  color: #e2e8f0 !important;
+  font-size: 13px !important;
+  padding: 2px 0 !important;
+}
+
+/* Smooth scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
