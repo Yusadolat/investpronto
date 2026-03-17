@@ -3,18 +3,6 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import crypto from "crypto";
-
-function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password).digest("hex");
-}
-
-export function verifyPassword(password: string, hash: string): boolean {
-  return hashPassword(password) === hash;
-}
-
-export { hashPassword };
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   session: { strategy: "jwt" },
@@ -45,6 +33,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const foundUser = user[0];
         if (!foundUser.passwordHash) return null;
 
+        const { verifyPassword } = await import("@/lib/password");
         if (!verifyPassword(password, foundUser.passwordHash)) return null;
 
         return {

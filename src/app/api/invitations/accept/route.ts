@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { invitations, users } from '@/db/schema';
 import { eq, and, gt } from 'drizzle-orm';
 import { isNull } from 'drizzle-orm';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword } from '@/lib/password';
 
 export async function POST(request: NextRequest) {
   try {
