@@ -16,6 +16,7 @@ export function verifyPassword(password: string, hash: string): boolean {
 export { hashPassword };
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",
