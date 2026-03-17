@@ -4,7 +4,14 @@ import { auth } from "@/lib/auth";
 export default auth((req) => {
   const { pathname } = req.nextUrl;
 
-  const publicRoutes = ["/login", "/invite", "/api/auth", "/api/webhooks"];
+  const publicRoutes = [
+    "/login",
+    "/invite",
+    "/api/auth",
+    "/api/webhooks",
+    "/api/invitations/verify",
+    "/api/invitations/accept",
+  ];
   const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
 
   if (isPublicRoute) return NextResponse.next();
