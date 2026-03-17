@@ -4,6 +4,7 @@ import * as React from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
+  ArrowUpRight,
   Building2,
   CreditCard,
   DollarSign,
@@ -172,6 +173,20 @@ export default function HostelDashboardPage() {
   const [submitting, setSubmitting] = React.useState<
     "setup" | "capital" | null
   >(null);
+  const [adjustCapitalModalOpen, setAdjustCapitalModalOpen] = React.useState(false);
+  const [adjustingCapital, setAdjustingCapital] = React.useState(false);
+  const [capitalPreview, setCapitalPreview] = React.useState<{
+    oldTotal: number;
+    newTotal: number;
+    additionalAmount: number;
+    preview: Array<{
+      investorUserId: string;
+      amountInvested: number;
+      currentShare: number;
+      newShare: number;
+      change: number;
+    }>;
+  } | null>(null);
 
   const fetchData = React.useCallback(async () => {
     try {
@@ -255,6 +270,53 @@ export default function HostelDashboardPage() {
       );
     } finally {
       setSubmitting(null);
+    }
+  }
+
+  async function handlePreviewCapitalAdjust(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const additionalAmount = Number(fd.get("additionalAmount"));
+    if (!additionalAmount || additionalAmount <= 0) return;
+
+    try {
+      const res = await fetch(`/api/hostels/${hostelId}/adjust-capital`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ additionalAmount }),
+      });
+      if (!res.ok) throw new Error("Failed to preview");
+      const preview = await res.json();
+      setCapitalPreview(preview);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Preview failed");
+    }
+  }
+
+  async function handleConfirmCapitalAdjust(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setAdjustingCapital(true);
+    const fd = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch(`/api/hostels/${hostelId}/adjust-capital`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          additionalAmount: Number(fd.get("additionalAmount")),
+          description: fd.get("description"),
+          category: fd.get("category") || "other",
+          recalculateShares: true,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to adjust capital");
+      setAdjustCapitalModalOpen(false);
+      setCapitalPreview(null);
+      await fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Capital adjustment failed");
+    } finally {
+      setAdjustingCapital(false);
     }
   }
 
@@ -652,9 +714,21 @@ export default function HostelDashboardPage() {
                 {formatNaira(transparency.summary.setup.totalBudget)} spent
               </p>
             </div>
-            <span className="font-display text-lg font-bold text-slate-900">
-              {setupProgress.toFixed(0)}%
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setCapitalPreview(null);
+                  setAdjustCapitalModalOpen(true);
+                }}
+                className="flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition-colors"
+              >
+                <ArrowUpRight className="h-3 w-3" />
+                Adjust
+              </button>
+              <span className="font-display text-lg font-bold text-slate-900">
+                {setupProgress.toFixed(0)}%
+              </span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -1130,6 +1204,152 @@ export default function HostelDashboardPage() {
               className="w-full sm:w-auto"
             >
               Save Contribution
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Adjust Capital Modal */}
+      <Modal
+        open={adjustCapitalModalOpen}
+        onClose={() => {
+          setAdjustCapitalModalOpen(false);
+          setCapitalPreview(null);
+        }}
+        title="Adjust Setup Capital"
+      >
+        <form
+          onSubmit={capitalPreview ? handleConfirmCapitalAdjust : handlePreviewCapitalAdjust}
+          className="space-y-4"
+        >
+          {/* Current total */}
+          <div className="rounded-xl bg-slate-50 p-3 flex items-center justify-between">
+            <span className="text-sm text-slate-500">Current Setup Budget</span>
+            <span className="font-display text-base font-bold text-slate-900">
+              {formatNaira(parseFloat(hostel.totalSetupCost || "0"))}
+            </span>
+          </div>
+
+          {/* Amount input — always visible so FormData has it */}
+          <div className={capitalPreview ? "pointer-events-none opacity-60" : ""}>
+            <Input
+              label="Additional amount (₦)"
+              name="additionalAmount"
+              type="number"
+              min="1"
+              step="1"
+              required
+              placeholder="e.g. 600000"
+            />
+          </div>
+
+          {/* Preview results */}
+          {capitalPreview && (
+            <>
+              {/* Summary card */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-600">Current Total</span>
+                  <span className="font-display font-bold text-slate-800">
+                    {formatNaira(capitalPreview.oldTotal)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-emerald-700">Addition</span>
+                  <span className="font-display font-bold text-emerald-700">
+                    +{formatNaira(capitalPreview.additionalAmount)}
+                  </span>
+                </div>
+                <div className="border-t border-emerald-200 pt-2 flex justify-between text-sm">
+                  <span className="font-semibold text-slate-800">New Total</span>
+                  <span className="font-display text-base font-bold text-slate-900">
+                    {formatNaira(capitalPreview.newTotal)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Investor share impact */}
+              {capitalPreview.preview.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
+                    Investor Share Impact
+                  </p>
+                  <div className="rounded-xl border border-slate-200 divide-y divide-slate-100">
+                    {capitalPreview.preview.map((inv) => {
+                      const investor = dashboard.investors.find(
+                        (i) => i.id === inv.investorUserId
+                      );
+                      return (
+                        <div
+                          key={inv.investorUserId}
+                          className="flex items-center justify-between px-3 py-2.5"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-800 truncate">
+                              {investor?.name || "Investor"}
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              {formatNaira(inv.amountInvested)} invested
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-sm shrink-0">
+                            <span className="text-slate-400 font-medium">
+                              {inv.currentShare}%
+                            </span>
+                            <ArrowRight className="h-3 w-3 text-slate-300" />
+                            <span className="font-display font-bold text-slate-900">
+                              {inv.newShare}%
+                            </span>
+                            <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 rounded-md px-1.5 py-0.5">
+                              {inv.change > 0 ? "+" : ""}
+                              {inv.change}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Description & category — required before confirming */}
+              <Input
+                label="Reason for adjustment"
+                name="description"
+                required
+                placeholder="e.g. Solar inverter upgrade"
+              />
+              <Select
+                label="Category"
+                name="category"
+                options={setupCategoryOptions}
+                defaultValue="power"
+              />
+            </>
+          )}
+
+          {/* Actions */}
+          <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                if (capitalPreview) {
+                  setCapitalPreview(null);
+                } else {
+                  setAdjustCapitalModalOpen(false);
+                }
+              }}
+              className="w-full sm:w-auto"
+            >
+              {capitalPreview ? "Back" : "Cancel"}
+            </Button>
+            <Button
+              type="submit"
+              loading={adjustingCapital}
+              className="w-full sm:w-auto"
+            >
+              {capitalPreview ? "Confirm Adjustment" : "Preview Changes"}
             </Button>
           </div>
         </form>
