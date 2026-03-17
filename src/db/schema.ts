@@ -30,6 +30,12 @@ export const hostelStatusEnum = pgEnum('hostel_status', [
   'setup',
 ]);
 
+export const recurringCostFrequencyEnum = pgEnum('recurring_cost_frequency', [
+  'monthly',
+  'quarterly',
+  'annual',
+]);
+
 export const membershipRoleEnum = pgEnum('membership_role', [
   'admin',
   'operator',
@@ -179,6 +185,11 @@ export const hostels = pgTable('hostels', {
     scale: 2,
   }).notNull(),
   status: hostelStatusEnum('status').notNull().default('setup'),
+  companySharePercent: numeric('company_share_percent', { precision: 5, scale: 2 }).notNull().default('0'),
+  ownerSharePercent: numeric('owner_share_percent', { precision: 5, scale: 2 }).notNull().default('0'),
+  investorPoolPercent: numeric('investor_pool_percent', { precision: 5, scale: 2 }).notNull().default('100'),
+  reserveFundPercent: numeric('reserve_fund_percent', { precision: 5, scale: 2 }).notNull().default('0'),
+  minimumPayoutAmount: numeric('minimum_payout_amount', { precision: 12, scale: 2 }).notNull().default('0'),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
 });
@@ -377,6 +388,23 @@ export const payouts = pgTable('payouts', {
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
 });
 
+export const recurringCosts = pgTable('recurring_costs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  hostelId: uuid('hostel_id')
+    .notNull()
+    .references(() => hostels.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: text('description'),
+  monthlyAmount: numeric('monthly_amount', { precision: 12, scale: 2 }).notNull(),
+  frequency: recurringCostFrequencyEnum('frequency').notNull().default('monthly'),
+  isActive: boolean('is_active').notNull().default(true),
+  createdBy: uuid('created_by')
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});
+
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').references(() => users.id),
@@ -453,6 +481,7 @@ export const hostelsRelations = relations(hostels, ({ one, many }) => ({
   payouts: many(payouts),
   auditLogs: many(auditLogs),
   invitations: many(invitations),
+  recurringCosts: many(recurringCosts),
 }));
 
 export const membershipsRelations = relations(memberships, ({ one }) => ({
@@ -586,6 +615,17 @@ export const payoutsRelations = relations(payouts, ({ one }) => ({
   agreement: one(investmentAgreements, {
     fields: [payouts.agreementId],
     references: [investmentAgreements.id],
+  }),
+}));
+
+export const recurringCostsRelations = relations(recurringCosts, ({ one }) => ({
+  hostel: one(hostels, {
+    fields: [recurringCosts.hostelId],
+    references: [hostels.id],
+  }),
+  creator: one(users, {
+    fields: [recurringCosts.createdBy],
+    references: [users.id],
   }),
 }));
 

@@ -1,5 +1,5 @@
 import { db } from '@/db';
-import { revenueEntries, expenseEntries, monthlyFinancialSnapshots, investmentAgreements, payouts } from '@/db/schema';
+import { revenueEntries, expenseEntries, monthlyFinancialSnapshots, investmentAgreements, payouts, hostels, recurringCosts } from '@/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { getMonthKey } from './utils';
 
@@ -10,6 +10,13 @@ export interface ProfitCalculation {
   refunds: number;
   netRevenue: number;
   totalExpenses: number;
+  totalRecurringCosts: number;
+  operatingProfit: number;
+  reserveFundAmount: number;
+  distributableProfit: number;
+  companyShare: number;
+  ownerShare: number;
+  investorPoolTotal: number;
   netProfit: number;
   investorDistributions: Array<{
     investorUserId: string;
@@ -25,6 +32,26 @@ export async function calculateMonthlyProfit(
   month?: number
 ): Promise<ProfitCalculation> {
   const targetMonth = month || getMonthKey();
+
+  // Fetch hostel profit sharing config
+  const hostelData = await db
+    .select({
+      companySharePercent: hostels.companySharePercent,
+      ownerSharePercent: hostels.ownerSharePercent,
+      investorPoolPercent: hostels.investorPoolPercent,
+      reserveFundPercent: hostels.reserveFundPercent,
+      minimumPayoutAmount: hostels.minimumPayoutAmount,
+    })
+    .from(hostels)
+    .where(eq(hostels.id, hostelId))
+    .limit(1);
+
+  const config = hostelData[0];
+  const companySharePct = parseFloat(config?.companySharePercent || '0');
+  const ownerSharePct = parseFloat(config?.ownerSharePercent || '0');
+  const investorPoolPct = parseFloat(config?.investorPoolPercent || '100');
+  const reserveFundPct = parseFloat(config?.reserveFundPercent || '0');
+  const minimumPayout = parseFloat(config?.minimumPayoutAmount || '0');
 
   // Calculate gross revenue (verified entries only)
   const revenueResult = await db
@@ -59,6 +86,32 @@ export async function calculateMonthlyProfit(
     );
 
   const totalExpenses = parseFloat(expenseResult[0]?.total || '0');
+
+  // Calculate active recurring costs
+  const activeCosts = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${recurringCosts.monthlyAmount}), 0)`,
+    })
+    .from(recurringCosts)
+    .where(
+      and(
+        eq(recurringCosts.hostelId, hostelId),
+        eq(recurringCosts.isActive, true)
+      )
+    );
+
+  const totalRecurringCosts = parseFloat(activeCosts[0]?.total || '0');
+
+  // Waterfall calculation
+  const operatingProfit = netRevenue - totalExpenses - totalRecurringCosts;
+  const reserveFundAmount = Math.max(0, operatingProfit * (reserveFundPct / 100));
+  const distributableProfit = Math.max(0, operatingProfit - reserveFundAmount);
+
+  const companyShare = round2(distributableProfit * (companySharePct / 100));
+  const ownerShare = round2(distributableProfit * (ownerSharePct / 100));
+  const investorPoolTotal = round2(distributableProfit * (investorPoolPct / 100));
+
+  // Legacy netProfit for snapshot compatibility
   const netProfit = netRevenue - totalExpenses;
 
   // Get active agreements for this hostel
@@ -72,24 +125,27 @@ export async function calculateMonthlyProfit(
       )
     );
 
-  // Calculate distributions based on agreement type
+  // Distribute investor pool among investors by their individual percentageShare
   const investorDistributions = agreements.map((agreement) => {
     const percentage = parseFloat(agreement.percentageShare || '0');
     let calculatedAmount = 0;
 
     switch (agreement.agreementType) {
       case 'profit_share':
-        calculatedAmount = Math.max(0, netProfit * (percentage / 100));
+      case 'equity':
+      case 'custom':
+        calculatedAmount = investorPoolTotal * (percentage / 100);
         break;
       case 'revenue_share':
         calculatedAmount = netRevenue * (percentage / 100);
         break;
-      case 'equity':
-        calculatedAmount = Math.max(0, netProfit * (percentage / 100));
-        break;
-      case 'custom':
-        calculatedAmount = Math.max(0, netProfit * (percentage / 100));
-        break;
+    }
+
+    calculatedAmount = round2(Math.max(0, calculatedAmount));
+
+    // Apply minimum payout threshold
+    if (calculatedAmount > 0 && calculatedAmount < minimumPayout) {
+      calculatedAmount = 0;
     }
 
     return {
@@ -97,7 +153,7 @@ export async function calculateMonthlyProfit(
       agreementId: agreement.id,
       agreementType: agreement.agreementType,
       percentageShare: percentage,
-      calculatedAmount: Math.round(calculatedAmount * 100) / 100,
+      calculatedAmount,
     };
   });
 
@@ -108,6 +164,13 @@ export async function calculateMonthlyProfit(
     refunds,
     netRevenue,
     totalExpenses,
+    totalRecurringCosts,
+    operatingProfit,
+    reserveFundAmount,
+    distributableProfit,
+    companyShare,
+    ownerShare,
+    investorPoolTotal,
     netProfit,
     investorDistributions,
   };
@@ -175,4 +238,8 @@ export async function createPayoutRecords(calc: ProfitCalculation): Promise<void
       }
     }
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }

@@ -18,6 +18,7 @@ import {
   Menu,
   X,
   BarChart3,
+  Percent,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -98,6 +99,11 @@ export function Sidebar({ user, hostelId, hostelName }: SidebarProps) {
               label: "Payouts",
               href: `/hostels/${hostelId}/payouts`,
               icon: <CreditCard className="h-[18px] w-[18px]" />,
+            },
+            {
+              label: "Profit Sharing",
+              href: `/hostels/${hostelId}/profit-sharing`,
+              icon: <Percent className="h-[18px] w-[18px]" />,
             },
           ],
         },

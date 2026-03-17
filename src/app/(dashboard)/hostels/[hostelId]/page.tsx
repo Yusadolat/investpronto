@@ -572,6 +572,11 @@ export default function HostelDashboardPage() {
                   icon: BarChart3,
                   label: "Reports",
                 },
+                {
+                  href: `/hostels/${hostelId}/profit-sharing`,
+                  icon: TrendingUp,
+                  label: "Profit Split",
+                },
               ].map((action) => (
                 <Link key={action.href} href={action.href}>
                   <button className="flex items-center gap-1.5 rounded-xl bg-white/8 hover:bg-white/12 backdrop-blur-sm border border-white/10 px-3.5 py-2 text-xs font-medium text-white transition-all">
