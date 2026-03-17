@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 
-export async function middleware(req: NextRequest) {
+export default auth((req) => {
   const { pathname } = req.nextUrl;
 
   const publicRoutes = ["/login", "/invite", "/api/auth", "/api/webhooks"];
@@ -10,8 +9,7 @@ export async function middleware(req: NextRequest) {
 
   if (isPublicRoute) return NextResponse.next();
 
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-  const isLoggedIn = !!token;
+  const isLoggedIn = !!req.auth;
 
   if (!isLoggedIn) {
     const loginUrl = new URL("/login", req.nextUrl.origin);
@@ -19,13 +17,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  const userRole = token?.role as string | undefined;
+  const userRole = req.auth?.user?.role as string | undefined;
   if (userRole === "investor" && pathname.startsWith("/admin")) {
     return NextResponse.redirect(new URL("/portal", req.nextUrl.origin));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|public).*)"],
