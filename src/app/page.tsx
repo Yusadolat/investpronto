@@ -8,7 +8,7 @@ export default async function RootPage() {
     redirect("/login");
   }
 
-  const role = (session.user as any).role;
+  const role = session.user.role;
   if (role === "investor") {
     redirect("/portal");
   }

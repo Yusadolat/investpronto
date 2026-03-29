@@ -490,7 +490,7 @@ export default function InvestorHostelDetailPage() {
       </button>
 
       {/* Premium Header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8 mb-8">
+      <div className="relative overflow-hidden rounded-2xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8 mb-8">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(250,204,21,0.06),transparent_50%)]" />
         <div
           className="absolute inset-0 opacity-[0.02]"
@@ -536,7 +536,7 @@ export default function InvestorHostelDetailPage() {
                 icon: DollarSign,
                 color: netProfit >= 0 ? "text-emerald-400" : "text-rose-400",
               },
-            ].map((metric, i) => (
+            ].map((metric) => (
               <div key={metric.label} className="">
                 <div className="flex items-center gap-1.5 mb-1">
                   <metric.icon className="h-3 w-3 text-slate-500" />
@@ -553,7 +553,7 @@ export default function InvestorHostelDetailPage() {
         </div>
 
         {/* Gold accent */}
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-amber-400/50 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-linear-to-r from-transparent via-amber-400/50 to-transparent" />
       </div>
 
       {/* Your Position Section */}
@@ -587,12 +587,12 @@ export default function InvestorHostelDetailPage() {
             icon: Receipt,
             accent: "from-slate-500 to-slate-600",
           },
-        ].map((stat, i) => (
+        ].map((stat) => (
           <div
             key={stat.label}
             className={` relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm`}
           >
-            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${stat.accent}`} />
+            <div className={`absolute top-0 left-0 right-0 h-1 bg-linear-to-r ${stat.accent}`} />
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
@@ -614,7 +614,7 @@ export default function InvestorHostelDetailPage() {
       {/* Agreement Card */}
       {agreement && (
         <Card className="mb-8 overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-slate-800 via-amber-400 to-slate-800" />
+          <div className="h-1 bg-linear-to-r from-slate-800 via-amber-400 to-slate-800" />
           <CardHeader>
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-slate-700" />
@@ -653,7 +653,7 @@ export default function InvestorHostelDetailPage() {
       {/* Profit Distribution Waterfall — Full Transparency */}
       {profitConfig && netProfit !== 0 && (
         <Card className="mb-8 overflow-hidden">
-          <div className="h-1 bg-gradient-to-r from-blue-500 via-amber-400 to-emerald-500" />
+          <div className="h-1 bg-linear-to-r from-blue-500 via-amber-400 to-emerald-500" />
           <CardHeader>
             <div className="flex items-center gap-2">
               <Percent className="h-4 w-4 text-slate-700" />
@@ -755,7 +755,7 @@ export default function InvestorHostelDetailPage() {
               </div>
 
               {/* Your specific share */}
-              <div className="mt-4 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 p-4 flex items-center justify-between">
+              <div className="mt-4 rounded-xl bg-linear-to-r from-slate-900 to-slate-800 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Your Share ({agreement?.percentageShare || 0}% of Investor Pool)</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -1088,7 +1088,7 @@ export default function InvestorHostelDetailPage() {
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-slate-700 to-slate-800 animate-progress"
+                      className="h-full rounded-full bg-linear-to-r from-slate-700 to-slate-800 animate-progress"
                       style={{
                         width: `${Math.min(
                           (hostelData.transparency.summary.setup.totalRecorded /

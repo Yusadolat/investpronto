@@ -5,14 +5,12 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowUpRight,
-  Building2,
   CreditCard,
   DollarSign,
   Plus,
   Receipt,
   TrendingUp,
   Users,
-  Wallet,
   ArrowRight,
   BarChart3,
   AlertTriangle,
@@ -25,7 +23,6 @@ import {
   Tooltip,
 } from "recharts";
 
-import { StatCard } from "@/components/ui/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

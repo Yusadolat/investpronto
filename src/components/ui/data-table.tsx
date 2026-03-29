@@ -84,5 +84,4 @@ function DataTable<T extends Record<string, any>>({
 }
 
 export { DataTable };
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type { DataTableProps, Column };

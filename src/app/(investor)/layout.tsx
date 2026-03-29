@@ -13,7 +13,7 @@ export default async function InvestorLayout({
     redirect("/login");
   }
 
-  const role = (session.user as any).role;
+  const role = session.user.role;
   if (role !== "investor") {
     redirect("/admin");
   }

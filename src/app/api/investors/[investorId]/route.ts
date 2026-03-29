@@ -8,6 +8,7 @@ import {
 } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
+import { assertInvestorRecordAccess } from '@/lib/investor-access';
 import { formatMonthKey, getLastNMonthKeys } from '@/lib/utils';
 
 export async function GET(
@@ -25,7 +26,8 @@ export async function GET(
       );
     }
 
-    await requireHostelAccess(hostelId);
+    const ctx = await requireHostelAccess(hostelId);
+    assertInvestorRecordAccess(ctx, investorId);
 
     // Get investor user info
     const [investor] = await db

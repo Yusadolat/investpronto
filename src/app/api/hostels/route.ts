@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { hostels, memberships, organizations } from '@/db/schema';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { requireAuth, requireRole, handleAuthError } from '@/lib/authorization';
 import { logAudit } from '@/lib/audit';
 
