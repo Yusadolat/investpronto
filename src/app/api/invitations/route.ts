@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { invitations, users, hostels } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 
 export async function GET(request: NextRequest) {

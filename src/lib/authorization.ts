@@ -17,7 +17,7 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   if (!session?.user?.id) return null;
   return {
     userId: session.user.id,
-    role: (session.user as any).role as UserRole,
+    role: session.user.role as UserRole,
     email: session.user.email!,
     name: session.user.name || '',
   };

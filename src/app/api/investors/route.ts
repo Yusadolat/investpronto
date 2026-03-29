@@ -14,6 +14,7 @@ import { generateInviteToken, formatNaira } from '@/lib/utils';
 import { sendEmail } from '@/lib/email';
 import { investorInvitationEmail } from '@/lib/email-templates';
 import crypto from 'crypto';
+import { hashPassword } from '@/lib/password';
 
 export async function GET(request: NextRequest) {
   try {
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     const ctx = await requireHostelAccess(hostelId, ['admin']);
 
     // Find or create user
-    let [existingUser] = await db
+    const [existingUser] = await db
       .select()
       .from(users)
       .where(eq(users.email, email))
@@ -95,10 +96,7 @@ export async function POST(request: NextRequest) {
       investorUserId = existingUser.id;
     } else {
       const tempPassword = crypto.randomBytes(16).toString('hex');
-      const passwordHash = crypto
-        .createHash('sha256')
-        .update(tempPassword)
-        .digest('hex');
+      const passwordHash = hashPassword(tempPassword);
 
       const [newUser] = await db
         .insert(users)

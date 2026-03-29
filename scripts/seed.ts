@@ -1,9 +1,9 @@
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { and, eq, inArray } from "drizzle-orm";
-import crypto from "crypto";
+import { eq, inArray } from "drizzle-orm";
 import { pathToFileURL } from "node:url";
+import { hashPassword } from "../src/lib/password";
 import {
   users,
   organizations,
@@ -17,6 +17,7 @@ import {
   monthlyFinancialSnapshots,
   payouts,
   auditLogs,
+  invitations,
 } from "../src/db/schema";
 
 // Load .env.local
@@ -37,13 +38,12 @@ export const SEED_IDENTIFIERS = {
 
 export interface SeedCleanupStore {
   findOrganizationIdBySlug(slug: string): Promise<string | null>;
-  findHostelIds(args: {
-    organizationId: string;
-    hostelSlug: string;
-  }): Promise<string[]>;
+  findHostelIds(args: { organizationId: string }): Promise<string[]>;
   findUserIdsByEmails(emails: readonly string[]): Promise<string[]>;
   deleteAuditLogsByHostelIds(hostelIds: readonly string[]): Promise<void>;
   deleteAuditLogsByUserIds(userIds: readonly string[]): Promise<void>;
+  deleteInvitationsByHostelIds(hostelIds: readonly string[]): Promise<void>;
+  deleteInvitationsByUserIds(userIds: readonly string[]): Promise<void>;
   deleteHostelsByIds(hostelIds: readonly string[]): Promise<void>;
   deleteUsersByIds(userIds: readonly string[]): Promise<void>;
   deleteOrganizationById(organizationId: string): Promise<void>;
@@ -59,7 +59,6 @@ export async function resetSeedFixture(
   const hostelIds = organizationId
     ? await store.findHostelIds({
         organizationId,
-        hostelSlug: identifiers.hostelSlug,
       })
     : [];
   const userIds = await store.findUserIdsByEmails(identifiers.userEmails);
@@ -73,6 +72,14 @@ export async function resetSeedFixture(
   }
 
   if (hostelIds.length > 0) {
+    await store.deleteInvitationsByHostelIds(hostelIds);
+  }
+
+  if (userIds.length > 0) {
+    await store.deleteInvitationsByUserIds(userIds);
+  }
+
+  if (hostelIds.length > 0) {
     await store.deleteHostelsByIds(hostelIds);
   }
 
@@ -83,10 +90,6 @@ export async function resetSeedFixture(
   if (organizationId) {
     await store.deleteOrganizationById(organizationId);
   }
-}
-
-function hashPassword(password: string): string {
-  return crypto.createHash("sha256").update(password).digest("hex");
 }
 
 function getMonthKey(date: Date = new Date()): number {
@@ -108,16 +111,11 @@ export async function seed() {
 
       return organization?.id ?? null;
     },
-    findHostelIds: async ({ organizationId, hostelSlug }) => {
+    findHostelIds: async ({ organizationId }) => {
       const rows = await db
         .select({ id: hostels.id })
         .from(hostels)
-        .where(
-          and(
-            eq(hostels.organizationId, organizationId),
-            eq(hostels.slug, hostelSlug)
-          )
-        );
+        .where(eq(hostels.organizationId, organizationId));
 
       return rows.map((row) => row.id);
     },
@@ -148,6 +146,24 @@ export async function seed() {
       }
 
       await db.delete(auditLogs).where(inArray(auditLogs.userId, [...userIds]));
+    },
+    deleteInvitationsByHostelIds: async (hostelIds) => {
+      if (hostelIds.length === 0) {
+        return;
+      }
+
+      await db
+        .delete(invitations)
+        .where(inArray(invitations.hostelId, [...hostelIds]));
+    },
+    deleteInvitationsByUserIds: async (userIds) => {
+      if (userIds.length === 0) {
+        return;
+      }
+
+      await db
+        .delete(invitations)
+        .where(inArray(invitations.invitedBy, [...userIds]));
     },
     deleteHostelsByIds: async (hostelIds) => {
       if (hostelIds.length === 0) {

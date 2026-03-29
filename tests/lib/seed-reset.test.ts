@@ -15,8 +15,8 @@ test("resetSeedFixture removes seeded records in a rerun-safe order", async () =
       calls.push(`findOrganization:${slug}`);
       return "org-1";
     },
-    findHostelIds: async ({ organizationId, hostelSlug }) => {
-      calls.push(`findHostels:${organizationId}:${hostelSlug}`);
+    findHostelIds: async ({ organizationId }) => {
+      calls.push(`findHostels:${organizationId}`);
       return ["hostel-1"];
     },
     findUserIdsByEmails: async (emails) => {
@@ -28,6 +28,12 @@ test("resetSeedFixture removes seeded records in a rerun-safe order", async () =
     },
     deleteAuditLogsByUserIds: async (userIds) => {
       calls.push(`deleteAuditLogsByUser:${userIds.join(",")}`);
+    },
+    deleteInvitationsByHostelIds: async (hostelIds) => {
+      calls.push(`deleteInvitationsByHostel:${hostelIds.join(",")}`);
+    },
+    deleteInvitationsByUserIds: async (userIds) => {
+      calls.push(`deleteInvitationsByUser:${userIds.join(",")}`);
     },
     deleteHostelsByIds: async (hostelIds) => {
       calls.push(`deleteHostels:${hostelIds.join(",")}`);
@@ -44,10 +50,12 @@ test("resetSeedFixture removes seeded records in a rerun-safe order", async () =
 
   assert.deepEqual(calls, [
     `findOrganization:${SEED_IDENTIFIERS.organizationSlug}`,
-    `findHostels:org-1:${SEED_IDENTIFIERS.hostelSlug}`,
+    "findHostels:org-1",
     `findUsers:${SEED_IDENTIFIERS.userEmails.join(",")}`,
     "deleteAuditLogsByHostel:hostel-1",
     "deleteAuditLogsByUser:user-1,user-2,user-3",
+    "deleteInvitationsByHostel:hostel-1",
+    "deleteInvitationsByUser:user-1,user-2,user-3",
     "deleteHostels:hostel-1",
     "deleteUsers:user-1,user-2,user-3",
     "deleteOrganization:org-1",
@@ -72,6 +80,12 @@ test("resetSeedFixture skips deletes when no seeded rows exist", async () => {
     },
     deleteAuditLogsByUserIds: async () => {
       calls.push("deleteAuditLogsByUser");
+    },
+    deleteInvitationsByHostelIds: async () => {
+      calls.push("deleteInvitationsByHostel");
+    },
+    deleteInvitationsByUserIds: async () => {
+      calls.push("deleteInvitationsByUser");
     },
     deleteHostelsByIds: async () => {
       calls.push("deleteHostels");

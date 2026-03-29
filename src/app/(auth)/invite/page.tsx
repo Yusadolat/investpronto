@@ -11,8 +11,6 @@ import {
   XCircle,
   Users,
 } from "lucide-react";
-import { LoadingSpinner } from "@/components/ui/loading";
-
 interface InvitationDetails {
   email: string;
   hostelName: string;
@@ -27,7 +25,7 @@ function InviteForm() {
 
   const [status, setStatus] = useState<
     "loading" | "valid" | "invalid" | "accepting" | "done"
-  >("loading");
+  >(() => (token ? "loading" : "invalid"));
   const [invitation, setInvitation] = useState<InvitationDetails | null>(null);
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -36,10 +34,7 @@ function InviteForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) {
-      setStatus("invalid");
-      return;
-    }
+    if (!token) return;
 
     async function verifyToken() {
       try {

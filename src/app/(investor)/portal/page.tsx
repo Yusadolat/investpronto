@@ -12,7 +12,6 @@ import {
   ArrowUpRight,
   TrendingUp,
   Wallet,
-  PieChart,
   ArrowRight,
   Briefcase,
 } from "lucide-react";

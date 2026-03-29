@@ -544,7 +544,7 @@ export default function InvestorsPage() {
               {inviteSuccess}
             </p>
             <p className="text-xs text-slate-500">
-              They'll receive an email with instructions to join.
+              They will receive an email with instructions to join.
             </p>
           </div>
         ) : (

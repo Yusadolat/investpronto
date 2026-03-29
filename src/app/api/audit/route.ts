@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { auditLogs, users } from '@/db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { requireHostelAccess, handleAuthError } from '@/lib/authorization';
 
 export async function GET(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const ctx = await requireHostelAccess(hostelId, ['admin']);
+    await requireHostelAccess(hostelId, ['admin']);
 
     // Also allow super_admin (requireHostelAccess already grants admin role to super_admin)
     const limit = limitParam ? parseInt(limitParam, 10) : 50;

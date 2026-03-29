@@ -12,7 +12,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { formatNaira } from "@/lib/utils";
 import {
   Building2,
-  Users,
   DollarSign,
   TrendingUp,
   Plus,
